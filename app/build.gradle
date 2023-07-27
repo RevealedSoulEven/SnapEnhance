@@ -43,13 +43,18 @@ android {
         armv8 {
             getIsDefault().set(true)
             ndk {
+                //noinspection ChromeOsAbiSupport
                 abiFilters "arm64-v8a"
             }
             dimension "release"
         }
         armv7 {
             ndk {
+                //noinspection ChromeOsAbiSupport
                 abiFilters "armeabi-v7a"
+            }
+            packagingOptions {
+                exclude 'lib/armeabi-v7a/*_neon.so'
             }
             dimension "release"
         }

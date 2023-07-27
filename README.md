@@ -1,5 +1,7 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/rhunk/SnapEnhance/main/app/src/main/res/mipmap-xxxhdpi/launcher_icon_foreground.png" height="250" />
+
+  [![Build](https://img.shields.io/github/actions/workflow/status/rhunk/SnapEnhance/android.yml?branch=main&logo=github&label=Build&event=push)](https://github.com/rhunk/SnapEnhance/actions/workflows/android.yml?query=branch%3Amain+event%3Apush+is%3Acompleted) [![Total](https://shields.io/github/downloads/rhunk/SnapEnhance/total?logo=Bookmeter&label=Downloads&logoColor=Green&color=Green)](https://github.com/rhunk/snapenhance/releases) [![Crowdin](https://badges.crowdin.net/snapenhance/localized.svg)](https://crowdin.com/project/snapenhance)
   
 # SnapEnhance
 SnapEnhance is an Xposed mod that enhances your Snapchat experience.<br/><br/>
@@ -10,6 +12,19 @@ Please note that this project is currently in development, so bugs and crashes m
 To Download the latest stable release, please visit the [Releases](https://github.com/rhunk/SnapEnhance/releases) page.<br/>
 You can also download the latest debug build from the [Actions](https://github.com/rhunk/SnapEnhance/actions) section.<br/>
 We no longer offer official LSPatch binaries for obvious reasons. However, you're welcome to patch them yourself, as they should theoretically work without any issues.
+
+## Quick Start
+Requirements:
+- Rooted using Magisk or KernelSU
+- LSPosed installed and fully functional
+
+Although using this in an unrooted enviroment using something like LSPatch should be working fine, it is not recommended to do so, use at your own risk!
+
+1. Install the module APK from either this [Github repo](https://github.com/rhunk/SnapEnhance/releases) or the [LSPosed repo](https://modules.lsposed.org/module/me.rhunk.snapenhance)
+2. Turn on the module in LSPosed and make sure Snapchat is in scope
+3. Force Stop Snapchat
+4. Open the menu by clicking the [Settings Gear Icon](https://i.imgur.com/2grm8li.png)
+
 ## Features
 <details open>
   <summary>Spying & Privacy</summary>
@@ -53,6 +68,7 @@ We no longer offer official LSPatch binaries for obvious reasons. However, you'r
   - Disable Spotlight
   - Enable Official App Appearance Settings (Darkmode)
   - Pin Conversations
+  - Multi Snap Limit bypass
 </details>
 
 <details open>
@@ -62,6 +78,7 @@ We no longer offer official LSPatch binaries for obvious reasons. However, you'r
   - Infinite Story Boost
   - My Eyes Only Bypass
   - AMOLED Dark Mode
+  - Chat Export (HTML, JSON and TXT)
 </details>
 
 ## License
@@ -79,3 +96,6 @@ When redistributing the software, it must remain under the same [GPLv3](https://
 - [rathmerdominik](https://github.com/rathmerdominik)
 - [Flole998](https://github.com/Flole998)
 - [authorisation](https://github.com/authorisation/)
+- [RevealedSoulEven](https://github.com/revealedsouleven)
+- [iBasim](https://github.com/ibasim)
+- [xerta555](https://github.com/xerta555)

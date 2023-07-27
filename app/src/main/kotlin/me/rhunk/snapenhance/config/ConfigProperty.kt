@@ -278,6 +278,22 @@ enum class ConfigProperty(
         ConfigCategory.UI_TWEAKS,
         ConfigStateValue(false)
     ),
+    STARTUP_PAGE_OVERRIDE(
+        "startup_page_override",
+        ConfigCategory.UI_TWEAKS,
+        ConfigStateSelection(
+            listOf(
+                "OFF",
+                "ngs_map_icon_container",
+                "ngs_chat_icon_container",
+                "ngs_camera_icon_container",
+                "ngs_community_icon_container",
+                "ngs_spotlight_icon_container",
+                "ngs_search_icon_container"
+            ),
+            "OFF"
+        )
+    ),
 
 
     //CAMERA
@@ -353,6 +369,11 @@ enum class ConfigProperty(
     ),
     AMOLED_DARK_MODE(
         "amoled_dark_mode",
+        ConfigCategory.EXPERIMENTAL_DEBUGGING,
+        ConfigStateValue(false)
+    ),
+    UNLIMITED_MULTI_SNAP(
+        "unlimited_multi_snap",
         ConfigCategory.EXPERIMENTAL_DEBUGGING,
         ConfigStateValue(false)
     );

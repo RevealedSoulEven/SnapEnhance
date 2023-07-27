@@ -4,11 +4,9 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.Application
 import android.content.Context
-import android.os.Build
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import me.rhunk.snapenhance.bridge.AbstractBridgeClient
-import me.rhunk.snapenhance.bridge.client.RootBridgeClient
 import me.rhunk.snapenhance.bridge.client.ServiceBridgeClient
 import me.rhunk.snapenhance.data.SnapClassCache
 import me.rhunk.snapenhance.hook.HookStage
@@ -80,10 +78,9 @@ class SnapEnhance {
 
     @SuppressLint("ObsoleteSdkInt")
     private fun provideBridgeClient(): AbstractBridgeClient {
-        //unsafe way for Android 9 devices
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+        /*if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
             return RootBridgeClient()
-        }
+        }*/
         return ServiceBridgeClient()
     }
 
