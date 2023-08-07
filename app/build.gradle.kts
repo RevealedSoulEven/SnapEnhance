@@ -6,8 +6,8 @@ plugins {
     alias(libs.plugins.kotlinAndroid)
 }
 
-val appVersionName = "1.1.0"
-val appVersionCode = 7
+val appVersionName = "1.2.1"
+val appVersionCode = 9
 
 android {
     namespace = "me.rhunk.snapenhance"
@@ -43,7 +43,11 @@ android {
             ndk {
                 abiFilters.add("arm64-v8a")
             }
-
+            packaging {
+                jniLibs {
+                    excludes += "**/*_neon.so"
+                }
+            }
             dimension = "abi"
         }
 

@@ -137,10 +137,7 @@ enum class ConfigProperty(
     GALLERY_MEDIA_SEND_OVERRIDE(
         "gallery_media_send_override",
         ConfigCategory.MEDIA_MANAGEMENT,
-        ConfigStateSelection(
-            listOf("OFF", "NOTE", "SNAP", "LIVE_SNAP"),
-            "OFF"
-        )
+        ConfigStateValue(false)
     ),
     AUTO_SAVE_MESSAGES("auto_save_messages",
         ConfigCategory.MEDIA_MANAGEMENT,
@@ -389,7 +386,12 @@ enum class ConfigProperty(
         ConfigCategory.EXPERIMENTAL_DEBUGGING,
         ConfigStateValue(false)
     ),
-    
+    NO_FRIEND_SCORE_DELAY(
+        "no_friend_score_delay",
+        ConfigCategory.EXPERIMENTAL_DEBUGGING,
+        ConfigStateValue(false)
+    ),
+
     //DEVICE SPOOFER
     DEVICE_SPOOF(
         "device_spoof",

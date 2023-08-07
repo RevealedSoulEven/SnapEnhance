@@ -16,7 +16,7 @@
         "check_for_updates": "Check for updates",
         "export_chat_messages": "Export chat messages"
     },
-   
+
     "property": {
         "message_logger": {
             "name": "Message Logger",
@@ -223,6 +223,10 @@
             "name": "Unlimited Multi Snap",
             "description": "Allows you to take an unlimited amount of multi snaps"
         },
+        "no_friend_score_delay": {
+            "name": "No Friend Score Delay",
+            "description": "Removes the delay in displaying friends scores. It will be updated immediately when you open a profile page"
+        },
         "device_spoof": {
             "name": "Spoof Device Values",
             "description": "Spoofs the devices values"
@@ -294,7 +298,7 @@
                 "abandon_video": "Missed Video Call"
             },
             "gallery_media_send_override": {
-                "OFF": "Off",
+                "ORIGINAL": "Original",
                 "NOTE": "Audio Note",
                 "SNAP": "Snap",
                 "LIVE_SNAP": "Snap with audio"
@@ -361,6 +365,10 @@
     "modal_option": {
         "profile_info": "Profile Info",
         "close": "Close"
+    },
+
+    "gallery_media_send_override": {
+        "multiple_media_toast": "You can only send one media at a time"
     },
 
     "conversation_preview": {

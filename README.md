@@ -59,7 +59,7 @@ Although using this in an unrooted enviroment using something like LSPatch shoul
   - Disable Camera
   - Immersive Camera Preview (Fix Snapchat's camera bug)
   - Hide certain UI Elements
-  - Show Streak Experation Info
+  - Show Streak Expiration Info
   - Disable Snap Splitting
   - Disable Video Length Restriction
   - Snapchat Plus
@@ -69,6 +69,7 @@ Although using this in an unrooted enviroment using something like LSPatch shoul
   - Enable Official App Appearance Settings (Darkmode)
   - Pin Conversations
   - Multi Snap Limit bypass
+  - Override Startup Page
 </details>
 
 <details open>
@@ -99,3 +100,4 @@ When redistributing the software, it must remain under the same [GPLv3](https://
 - [RevealedSoulEven](https://github.com/revealedsouleven)
 - [iBasim](https://github.com/ibasim)
 - [xerta555](https://github.com/xerta555)
+- [TheVisual](https://github.com/TheVisual)
