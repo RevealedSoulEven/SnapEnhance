@@ -6,59 +6,64 @@ plugins {
     alias(libs.plugins.kotlinAndroid)
 }
 
-val appVersionName = "1.2.1"
-val appVersionCode = 9
-
 android {
-    namespace = "me.rhunk.snapenhance"
-    compileSdk = 33
+    namespace = rootProject.ext["applicationId"].toString()
+    compileSdk = 34
 
     buildFeatures {
         aidl = true
+        compose = true
+    }
+
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.4.8"
     }
 
     defaultConfig {
-        applicationId = "me.rhunk.snapenhance"
+        applicationId = rootProject.ext["applicationId"].toString()
         minSdk = 28
-        //noinspection OldTargetApi
-        targetSdk = 33
-
-        versionCode = appVersionCode
-        versionName = appVersionName
+        targetSdk = 34
         multiDexEnabled = true
     }
 
-
     buildTypes {
         release {
+            isMinifyEnabled = true
+            proguardFiles += file("proguard-rules.pro")
+        }
+        debug {
+            isDebuggable = true
             isMinifyEnabled = false
-            isShrinkResources = false
         }
     }
 
     flavorDimensions += "abi"
 
+    //noinspection ChromeOsAbiSupport
     productFlavors {
+        packaging {
+            jniLibs {
+                excludes += "**/*_neon.so"
+            }
+            resources {
+                excludes += "DebugProbesKt.bin"
+                excludes += "okhttp3/internal/publicsuffix/**"
+                excludes += "META-INF/*.version"
+                excludes += "META-INF/services/**"
+                excludes += "META-INF/*.kotlin_builtins"
+                excludes += "META-INF/*.kotlin_module"
+            }
+        }
         create("armv8") {
             ndk {
-                abiFilters.add("arm64-v8a")
-            }
-            packaging {
-                jniLibs {
-                    excludes += "**/*_neon.so"
-                }
+                abiFilters += "arm64-v8a"
             }
             dimension = "abi"
         }
 
         create("armv7") {
             ndk {
-                abiFilters.add("armeabi-v7a")
-            }
-            packaging {
-                jniLibs {
-                    excludes += "**/*_neon.so"
-                }
+                abiFilters += "armeabi-v7a"
             }
             dimension = "abi"
         }
@@ -70,7 +75,7 @@ android {
 
     applicationVariants.all {
         outputs.map { it as BaseVariantOutputImpl }.forEach { variant ->
-            variant.outputFileName = "app-${appVersionName}-${variant.name}.apk"
+            variant.outputFileName = "app-${rootProject.ext["appVersionName"]}-${variant.name}.apk"
         }
     }
 
@@ -85,24 +90,22 @@ android {
 }
 
 dependencies {
-    compileOnly(files("libs/LSPosed-api-1.0-SNAPSHOT.jar"))
-    implementation(libs.coroutines)
-    implementation(libs.kotlin.reflect)
-    implementation(libs.recyclerview)
-    implementation(libs.gson)
-    implementation(libs.ffmpeg.kit)
-    implementation(libs.osmdroid.android)
-    implementation(libs.okhttp)
+    implementation(project(":core"))
+    implementation(libs.androidx.material.icons.core)
+    implementation(libs.androidx.material.ripple)
+    implementation(libs.androidx.material.icons.extended)
+    implementation(libs.androidx.material3)
+    implementation(libs.androidx.activity.ktx)
+    implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.documentfile)
+    implementation(libs.gson)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.video)
+    implementation(libs.osmdroid.android)
 
-    implementation(project(":mapper"))
-}
-
-tasks.register("getVersion") {
-    doLast {
-        val versionFile = File("app/build/version.txt")
-        versionFile.writeText(android.defaultConfig.versionName.toString())
-    }
+    debugImplementation("androidx.compose.ui:ui-tooling:1.4.3")
+    implementation("androidx.compose.ui:ui-tooling-preview:1.4.3")
+    implementation(kotlin("reflect"))
 }
 
 afterEvaluate {

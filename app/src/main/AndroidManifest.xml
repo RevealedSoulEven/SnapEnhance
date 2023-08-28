@@ -2,21 +2,22 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <uses-permission android:name="android.permission.DOWNLOAD_WITHOUT_NOTIFICATION" />
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        tools:ignore="ScopedStorage" />
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
-        tools:ignore="ScopedStorage" />
+    <queries>
+        <package android:name="com.snapchat.android" />
+    </queries>
+
     <application
         android:usesCleartextTraffic="true"
         android:requestLegacyExternalStorage="true"
         android:label="@string/app_name"
-        tools:targetApi="31"
+        tools:targetApi="34"
+        android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/launcher_icon">
         <meta-data
             android:name="xposedmodule"
@@ -26,10 +27,10 @@
             android:value="Enhanced Snapchat" />
         <meta-data
             android:name="xposedminversion"
-            android:value="53" />
+            android:value="93" />
         <meta-data
             android:name="xposedscope"
-            android:resource="@array/sc_scope" />
+            android:resource="@array/xposed_scope" />
 
         <service
             android:name=".bridge.BridgeService"
@@ -38,8 +39,9 @@
         </service>
 
         <activity
-            android:name=".ui.download.DownloadManagerActivity"
+            android:name=".ui.manager.MainActivity"
             android:theme="@style/AppTheme"
+            android:launchMode="singleTask"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -47,23 +49,21 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".ui.map.MapActivity"
+            android:name=".ui.setup.SetupActivity"
+            android:launchMode="singleTask"
             android:exported="true"
+            android:theme="@style/AppTheme"
             android:excludeFromRecents="true" />
         <activity
-            android:name=".ui.config.ConfigActivity"
-            android:theme="@style/AppTheme"
-            android:excludeFromRecents="true"
-            android:exported="true" />
-        <activity
-            android:name=".ui.spoof.DeviceSpooferActivity"
-            android:theme="@style/AppTheme"
-            android:excludeFromRecents="true"
-            android:exported="true" />
+            android:name=".ui.MapActivity"
+            android:exported="true"
+            android:excludeFromRecents="true" />
         <activity android:name=".bridge.ForceStartActivity"
             android:theme="@android:style/Theme.NoDisplay"
             android:excludeFromRecents="true"
             android:exported="true" />
+
+        <receiver android:name=".messaging.StreaksReminder" />
     </application>
 
 </manifest>

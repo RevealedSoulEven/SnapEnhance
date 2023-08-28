@@ -1,8 +1,9 @@
 package me.rhunk.snapenhance.download
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.widget.Toast
 import androidx.documentfile.provider.DocumentFile
@@ -16,18 +17,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import me.rhunk.snapenhance.Constants
 import me.rhunk.snapenhance.Logger
-import me.rhunk.snapenhance.SharedContext
+import me.rhunk.snapenhance.RemoteSideContext
 import me.rhunk.snapenhance.bridge.DownloadCallback
-import me.rhunk.snapenhance.bridge.wrapper.ConfigWrapper
-import me.rhunk.snapenhance.config.ConfigProperty
 import me.rhunk.snapenhance.data.FileType
+import me.rhunk.snapenhance.download.data.DownloadMediaType
 import me.rhunk.snapenhance.download.data.DownloadMetadata
+import me.rhunk.snapenhance.download.data.DownloadObject
 import me.rhunk.snapenhance.download.data.DownloadRequest
+import me.rhunk.snapenhance.download.data.DownloadStage
 import me.rhunk.snapenhance.download.data.InputMedia
 import me.rhunk.snapenhance.download.data.MediaEncryptionKeyPair
-import me.rhunk.snapenhance.download.data.PendingDownload
-import me.rhunk.snapenhance.download.enums.DownloadMediaType
-import me.rhunk.snapenhance.download.enums.DownloadStage
 import me.rhunk.snapenhance.util.download.RemoteMediaResolver
 import me.rhunk.snapenhance.util.snap.MediaDownloaderHelper
 import java.io.File
@@ -57,16 +56,12 @@ data class DownloadedFile(
  */
 @OptIn(ExperimentalEncodingApi::class)
 class DownloadProcessor (
-    private val context: Context,
+    private val remoteSideContext: RemoteSideContext,
     private val callback: DownloadCallback
 ) {
-    companion object {
-        const val DOWNLOAD_REQUEST_EXTRA = "request"
-        const val DOWNLOAD_METADATA_EXTRA = "metadata"
-    }
 
     private val translation by lazy {
-        SharedContext.translation.getCategory("download_processor")
+        remoteSideContext.translation.getCategory("download_processor")
     }
 
     private val gson by lazy {
@@ -74,9 +69,27 @@ class DownloadProcessor (
     }
 
     private fun fallbackToast(message: Any) {
-        android.os.Handler(context.mainLooper).post {
-            Toast.makeText(context, message.toString(), Toast.LENGTH_SHORT).show()
+        android.os.Handler(remoteSideContext.androidContext.mainLooper).post {
+            Toast.makeText(remoteSideContext.androidContext, message.toString(), Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun callbackOnSuccess(path: String) = runCatching {
+        callback.onSuccess(path)
+    }.onFailure {
+        fallbackToast(it)
+    }
+
+    private fun callbackOnFailure(message: String, throwable: String? = null) = runCatching {
+        callback.onFailure(message, throwable)
+    }.onFailure {
+        fallbackToast("$message\n$throwable")
+    }
+
+    private fun callbackOnProgress(message: String) = runCatching {
+        callback.onProgress(message)
+    }.onFailure {
+        fallbackToast(it)
     }
 
     private fun extractZip(inputStream: InputStream): List<File> {
@@ -105,33 +118,42 @@ class DownloadProcessor (
         return CipherInputStream(inputStream, cipher)
     }
 
-    private fun createNeededDirectories(file: File): File {
-        val directory = file.parentFile ?: return file
-        if (!directory.exists()) {
-            directory.mkdirs()
-        }
-        return file
-    }
-
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
-    private suspend fun saveMediaToGallery(inputFile: File, pendingDownload: PendingDownload) {
+    private suspend fun saveMediaToGallery(inputFile: File, downloadObject: DownloadObject) {
         if (coroutineContext.job.isCancelled) return
 
-        val config = ConfigWrapper().apply { loadFromContext(context) }
-
         runCatching {
-            val fileType = FileType.fromFile(inputFile)
+            var fileType = FileType.fromFile(inputFile)
+
             if (fileType == FileType.UNKNOWN) {
-                callback.onFailure(translation.format("failed_gallery_toast", "error" to "Unknown media type"), null)
+                callbackOnFailure(translation.format("failed_gallery_toast", "error" to "Unknown media type"), null)
                 return
             }
 
-            val fileName = pendingDownload.metadata.outputPath.substringAfterLast("/") + "." + fileType.fileExtension
+            if (fileType.isImage) {
+                remoteSideContext.config.root.downloader.forceImageFormat.getNullable()?.let { format ->
+                    val bitmap = BitmapFactory.decodeFile(inputFile.absolutePath) ?: throw Exception("Failed to decode bitmap")
+                    @Suppress("DEPRECATION") val compressFormat = when (format) {
+                        "png" -> Bitmap.CompressFormat.PNG
+                        "jpg" -> Bitmap.CompressFormat.JPEG
+                        "webp" -> Bitmap.CompressFormat.WEBP
+                        else -> throw Exception("Invalid image format")
+                    }
 
-            val outputFolder = DocumentFile.fromTreeUri(context, Uri.parse(config.string(ConfigProperty.SAVE_FOLDER)))
+                    val outputStream = inputFile.outputStream()
+                    bitmap.compress(compressFormat, 100, outputStream)
+                    outputStream.close()
+
+                    fileType = FileType.fromFile(inputFile)
+                }
+            }
+
+            val fileName = downloadObject.metadata.outputPath.substringAfterLast("/") + "." + fileType.fileExtension
+
+            val outputFolder = DocumentFile.fromTreeUri(remoteSideContext.androidContext, Uri.parse(remoteSideContext.config.root.downloader.saveFolder.get()))
                 ?: throw Exception("Failed to open output folder")
 
-            val outputFileFolder = pendingDownload.metadata.outputPath.let {
+            val outputFileFolder = downloadObject.metadata.outputPath.let {
                 if (it.contains("/")) {
                     it.substringBeforeLast("/").split("/").fold(outputFolder) { folder, name ->
                         folder.findFile(name) ?: folder.createDirectory(name)!!
@@ -142,34 +164,30 @@ class DownloadProcessor (
             }
 
             val outputFile = outputFileFolder.createFile(fileType.mimeType, fileName)!!
-            val outputStream = context.contentResolver.openOutputStream(outputFile.uri)!!
+            val outputStream = remoteSideContext.androidContext.contentResolver.openOutputStream(outputFile.uri)!!
 
             inputFile.inputStream().use { inputStream ->
                 inputStream.copyTo(outputStream)
             }
 
-            pendingDownload.outputFile = outputFile.uri.toString()
-            pendingDownload.downloadStage = DownloadStage.SAVED
+            downloadObject.outputFile = outputFile.uri.toString()
+            downloadObject.downloadStage = DownloadStage.SAVED
 
             runCatching {
                 val mediaScanIntent = Intent("android.intent.action.MEDIA_SCANNER_SCAN_FILE")
                 mediaScanIntent.setData(outputFile.uri)
-                context.sendBroadcast(mediaScanIntent)
+                remoteSideContext.androidContext.sendBroadcast(mediaScanIntent)
             }.onFailure {
                 Logger.error("Failed to scan media file", it)
-                callback.onFailure(translation.format("failed_gallery_toast", "error" to it.toString()), it.message)
+                callbackOnFailure(translation.format("failed_gallery_toast", "error" to it.toString()), it.message)
             }
 
             Logger.debug("download complete")
-            fileName.let {
-                runCatching { callback.onSuccess(it) }.onFailure { fallbackToast(it) }
-            }
+            callbackOnSuccess(fileName)
         }.onFailure { exception ->
             Logger.error(exception)
-            translation.format("failed_gallery_toast", "error" to exception.toString()).let {
-                runCatching { callback.onFailure(it, exception.message) }.onFailure { fallbackToast(it) }
-            }
-            pendingDownload.downloadStage = DownloadStage.FAILED
+            callbackOnFailure(translation.format("failed_gallery_toast", "error" to exception.toString()), exception.message)
+            downloadObject.downloadStage = DownloadStage.FAILED
         }
     }
 
@@ -185,7 +203,9 @@ class DownloadProcessor (
             fun handleInputStream(inputStream: InputStream) {
                 createMediaTempFile().apply {
                     if (inputMedia.encryption != null) {
-                        decryptInputStream(inputStream, inputMedia.encryption).use { decryptedInputStream ->
+                        decryptInputStream(inputStream,
+                            inputMedia.encryption!!
+                        ).use { decryptedInputStream ->
                             decryptedInputStream.copyTo(outputStream())
                         }
                     } else {
@@ -226,13 +246,13 @@ class DownloadProcessor (
         downloadedMedias
     }
 
-    private suspend fun downloadRemoteMedia(pendingDownloadObject: PendingDownload, downloadedMedias: Map<InputMedia, DownloadedFile>, downloadRequest: DownloadRequest) {
+    private suspend fun downloadRemoteMedia(downloadObjectObject: DownloadObject, downloadedMedias: Map<InputMedia, DownloadedFile>, downloadRequest: DownloadRequest) {
         downloadRequest.inputMedias.first().let { inputMedia ->
             val mediaType = inputMedia.type
             val media = downloadedMedias[inputMedia]!!
 
             if (!downloadRequest.isDashPlaylist) {
-                saveMediaToGallery(media.file, pendingDownloadObject)
+                saveMediaToGallery(media.file, downloadObjectObject)
                 media.file.delete()
                 return
             }
@@ -253,9 +273,7 @@ class DownloadProcessor (
             val xmlData = dashPlaylistFile.outputStream()
             TransformerFactory.newInstance().newTransformer().transform(DOMSource(playlistXml), StreamResult(xmlData))
 
-            translation.format("download_toast", "path" to dashPlaylistFile.nameWithoutExtension).let {
-                runCatching { callback.onProgress(it) }.onFailure { fallbackToast(it) }
-            }
+            callbackOnProgress(translation.format("download_toast", "path" to dashPlaylistFile.nameWithoutExtension))
             val outputFile = File.createTempFile("dash", ".mp4")
             runCatching {
                 MediaDownloaderHelper.downloadDashChapterFile(
@@ -263,14 +281,12 @@ class DownloadProcessor (
                     output = outputFile,
                     startTime = dashOptions.offsetTime,
                     duration = dashOptions.duration)
-                saveMediaToGallery(outputFile, pendingDownloadObject)
+                saveMediaToGallery(outputFile, downloadObjectObject)
             }.onFailure { exception ->
                 if (coroutineContext.job.isCancelled) return@onFailure
                 Logger.error(exception)
-                translation.format("failed_processing_toast", "error" to exception.toString()).let {
-                    runCatching { callback.onFailure(it, exception.message) }.onFailure { fallbackToast(it) }
-                }
-                pendingDownloadObject.downloadStage = DownloadStage.FAILED
+                callbackOnFailure(translation.format("failed_processing_toast", "error" to exception.toString()), exception.message)
+                downloadObjectObject.downloadStage = DownloadStage.FAILED
             }
 
             dashPlaylistFile.delete()
@@ -287,26 +303,27 @@ class DownloadProcessor (
 
     fun onReceive(intent: Intent) {
         CoroutineScope(Dispatchers.IO).launch {
-            val downloadMetadata = gson.fromJson(intent.getStringExtra(DOWNLOAD_METADATA_EXTRA)!!, DownloadMetadata::class.java)
-            val downloadRequest = gson.fromJson(intent.getStringExtra(DOWNLOAD_REQUEST_EXTRA)!!, DownloadRequest::class.java)
+            val downloadMetadata = gson.fromJson(intent.getStringExtra(DownloadManagerClient.DOWNLOAD_METADATA_EXTRA)!!, DownloadMetadata::class.java)
+            val downloadRequest = gson.fromJson(intent.getStringExtra(DownloadManagerClient.DOWNLOAD_REQUEST_EXTRA)!!, DownloadRequest::class.java)
 
-            SharedContext.downloadTaskManager.canDownloadMedia(downloadMetadata.mediaIdentifier)?.let { downloadStage ->
+            remoteSideContext.downloadTaskManager.canDownloadMedia(downloadMetadata.mediaIdentifier)?.let { downloadStage ->
                 translation[if (downloadStage.isFinalStage) {
                     "already_downloaded_toast"
                 } else {
                     "already_queued_toast"
                 }].let {
-                    runCatching { callback.onFailure(it, null) }.onFailure { fallbackToast(it) }
+                    callbackOnFailure(it, null)
                 }
                 return@launch
             }
 
-            val pendingDownloadObject = PendingDownload(
+            val downloadObjectObject = DownloadObject(
                 metadata = downloadMetadata
-            )
+            ).apply { downloadTaskManager = remoteSideContext.downloadTaskManager }
 
-            SharedContext.downloadTaskManager.addTask(pendingDownloadObject)
-            pendingDownloadObject.apply {
+            downloadObjectObject.also {
+                remoteSideContext.downloadTaskManager.addTask(it)
+            }.apply {
                 job = coroutineContext.job
                 downloadStage = DownloadStage.DOWNLOADING
             }
@@ -347,10 +364,8 @@ class DownloadProcessor (
                     val renamedOverlayMedia = renameFromFileType(overlayMedia.file, overlayMedia.fileType)
                     val mergedOverlay: File = File.createTempFile("merged", "." + media.fileType.fileExtension)
                     runCatching {
-                        translation.format("download_toast", "path" to media.file.nameWithoutExtension).let {
-                            runCatching { callback.onProgress(it) }.onFailure { fallbackToast(it) }
-                        }
-                        pendingDownloadObject.downloadStage = DownloadStage.MERGING
+                        callbackOnProgress(translation.format("download_toast", "path" to media.file.nameWithoutExtension))
+                        downloadObjectObject.downloadStage = DownloadStage.MERGING
 
                         MediaDownloaderHelper.mergeOverlayFile(
                             media = renamedMedia,
@@ -358,14 +373,12 @@ class DownloadProcessor (
                             output = mergedOverlay
                         )
 
-                        saveMediaToGallery(mergedOverlay, pendingDownloadObject)
+                        saveMediaToGallery(mergedOverlay, downloadObjectObject)
                     }.onFailure { exception ->
                         if (coroutineContext.job.isCancelled) return@onFailure
                         Logger.error(exception)
-                        translation.format("failed_processing_toast", "error" to exception.toString()).let {
-                            runCatching { callback.onFailure(it, exception.message) }.onFailure { fallbackToast(it) }
-                        }
-                        pendingDownloadObject.downloadStage = DownloadStage.MERGE_FAILED
+                        callbackOnFailure(translation.format("failed_processing_toast", "error" to exception.toString()), exception.message)
+                        downloadObjectObject.downloadStage = DownloadStage.MERGE_FAILED
                     }
 
                     mergedOverlay.delete()
@@ -374,13 +387,11 @@ class DownloadProcessor (
                     return@launch
                 }
 
-                downloadRemoteMedia(pendingDownloadObject, downloadedMedias, downloadRequest)
+                downloadRemoteMedia(downloadObjectObject, downloadedMedias, downloadRequest)
             }.onFailure { exception ->
-                pendingDownloadObject.downloadStage = DownloadStage.FAILED
+                downloadObjectObject.downloadStage = DownloadStage.FAILED
                 Logger.error(exception)
-                translation["failed_generic_toast"].let {
-                    runCatching { callback.onFailure(it, exception.message) }.onFailure { fallbackToast(it) }
-                }
+                callbackOnFailure(translation["failed_generic_toast"], exception.message)
             }
         }
     }

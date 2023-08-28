@@ -5,8 +5,8 @@ plugins {
 }
 
 android {
-    namespace = "me.rhunk.snapenhance.mapper"
-    compileSdk = 33
+    namespace = rootProject.ext["applicationId"].toString() + ".mapper"
+    compileSdk = 34
 
     kotlinOptions {
         jvmTarget = "1.8"
