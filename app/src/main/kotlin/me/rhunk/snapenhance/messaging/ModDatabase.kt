@@ -1,17 +1,17 @@
 package me.rhunk.snapenhance.messaging
 
 import android.database.sqlite.SQLiteDatabase
-import me.rhunk.snapenhance.Logger
 import me.rhunk.snapenhance.RemoteSideContext
-import me.rhunk.snapenhance.core.messaging.FriendStreaks
-import me.rhunk.snapenhance.core.messaging.MessagingFriendInfo
-import me.rhunk.snapenhance.core.messaging.MessagingGroupInfo
-import me.rhunk.snapenhance.core.messaging.MessagingRuleType
-import me.rhunk.snapenhance.database.objects.FriendInfo
-import me.rhunk.snapenhance.util.SQLiteDatabaseHelper
-import me.rhunk.snapenhance.util.ktx.getInteger
-import me.rhunk.snapenhance.util.ktx.getLongOrNull
-import me.rhunk.snapenhance.util.ktx.getStringOrNull
+import me.rhunk.snapenhance.common.data.FriendStreaks
+import me.rhunk.snapenhance.common.data.MessagingFriendInfo
+import me.rhunk.snapenhance.common.data.MessagingGroupInfo
+import me.rhunk.snapenhance.common.data.MessagingRuleType
+import me.rhunk.snapenhance.common.database.impl.FriendInfo
+import me.rhunk.snapenhance.common.scripting.type.ModuleInfo
+import me.rhunk.snapenhance.common.util.SQLiteDatabaseHelper
+import me.rhunk.snapenhance.common.util.ktx.getInteger
+import me.rhunk.snapenhance.common.util.ktx.getLongOrNull
+import me.rhunk.snapenhance.common.util.ktx.getStringOrNull
 import java.util.concurrent.Executors
 
 
@@ -28,7 +28,7 @@ class ModDatabase(
             runCatching {
                 block()
             }.onFailure {
-                Logger.error("Failed to execute async block", it)
+                context.log.error("Failed to execute async block", it)
             }
         }
     }
@@ -61,17 +61,12 @@ class ModDatabase(
                 "expirationTimestamp BIGINT",
                 "length INTEGER"
             ),
-            "analytics_config" to listOf(
-                "userId VARCHAR PRIMARY KEY",
-                "modes VARCHAR"
-            ),
-            "analytics" to listOf(
-                "hash VARCHAR PRIMARY KEY",
-                "userId VARCHAR",
-                "conversationId VARCHAR",
-                "timestamp BIGINT",
-                "eventName VARCHAR",
-                "eventData VARCHAR"
+            "scripts" to listOf(
+                "name VARCHAR PRIMARY KEY",
+                "version VARCHAR NOT NULL",
+                "description VARCHAR",
+                "author VARCHAR NOT NULL",
+                "enabled BOOLEAN"
             )
         ))
     }
@@ -80,11 +75,13 @@ class ModDatabase(
         return database.rawQuery("SELECT * FROM groups", null).use { cursor ->
             val groups = mutableListOf<MessagingGroupInfo>()
             while (cursor.moveToNext()) {
-                groups.add(MessagingGroupInfo(
+                groups.add(
+                    MessagingGroupInfo(
                     conversationId = cursor.getStringOrNull("conversationId")!!,
                     name = cursor.getStringOrNull("name")!!,
                     participantsCount = cursor.getInteger("participantsCount")
-                ))
+                )
+                )
             }
             groups
         }
@@ -95,15 +92,17 @@ class ModDatabase(
             val friends = mutableListOf<MessagingFriendInfo>()
             while (cursor.moveToNext()) {
                 runCatching {
-                    friends.add(MessagingFriendInfo(
+                    friends.add(
+                        MessagingFriendInfo(
                         userId = cursor.getStringOrNull("userId")!!,
                         displayName = cursor.getStringOrNull("displayName"),
                         mutableUsername = cursor.getStringOrNull("mutableUsername")!!,
                         bitmojiId = cursor.getStringOrNull("bitmojiId"),
                         selfieId = cursor.getStringOrNull("selfieId")
-                    ))
+                    )
+                    )
                 }.onFailure {
-                    Logger.error("Failed to parse friend", it)
+                    context.log.error("Failed to parse friend", it)
                 }
             }
             friends
@@ -144,7 +143,7 @@ class ModDatabase(
 
                     database.execSQL("INSERT OR REPLACE INTO streaks (userId, notify, expirationTimestamp, length) VALUES (?, ?, ?, ?)", arrayOf(
                         friend.userId,
-                        streaks?.notify ?: false,
+                        streaks?.notify ?: true,
                         friend.streakExpirationTimestamp,
                         friend.streakLength
                     ))
@@ -163,7 +162,11 @@ class ModDatabase(
         )).use { cursor ->
             val rules = mutableListOf<MessagingRuleType>()
             while (cursor.moveToNext()) {
-                rules.add(MessagingRuleType.getByName(cursor.getStringOrNull("type")!!))
+                runCatching {
+                    rules.add(MessagingRuleType.getByName(cursor.getStringOrNull("type")!!) ?: return@runCatching)
+                }.onFailure {
+                    context.log.error("Failed to parse rule", it)
+                }
             }
             rules
         }
@@ -202,12 +205,14 @@ class ModDatabase(
         executeAsync {
             database.execSQL("DELETE FROM friends WHERE userId = ?", arrayOf(userId))
             database.execSQL("DELETE FROM streaks WHERE userId = ?", arrayOf(userId))
+            database.execSQL("DELETE FROM rules WHERE targetUuid = ?", arrayOf(userId))
         }
     }
 
     fun deleteGroup(conversationId: String) {
         executeAsync {
             database.execSQL("DELETE FROM groups WHERE conversationId = ?", arrayOf(conversationId))
+            database.execSQL("DELETE FROM rules WHERE targetUuid = ?", arrayOf(conversationId))
         }
     }
 
@@ -240,6 +245,76 @@ class ModDatabase(
                 if (notify) 1 else 0,
                 userId
             ))
+        }
+    }
+
+    fun getRuleIds(type: String): MutableList<String> {
+        return database.rawQuery("SELECT targetUuid FROM rules WHERE type = ?", arrayOf(type)).use { cursor ->
+            val ruleIds = mutableListOf<String>()
+            while (cursor.moveToNext()) {
+                ruleIds.add(cursor.getStringOrNull("targetUuid")!!)
+            }
+            ruleIds
+        }
+    }
+
+    fun getScripts(): List<ModuleInfo> {
+        return database.rawQuery("SELECT * FROM scripts", null).use { cursor ->
+            val scripts = mutableListOf<ModuleInfo>()
+            while (cursor.moveToNext()) {
+                scripts.add(
+                    ModuleInfo(
+                        name = cursor.getStringOrNull("name")!!,
+                        version = cursor.getStringOrNull("version")!!,
+                        description = cursor.getStringOrNull("description"),
+                        author = cursor.getStringOrNull("author"),
+                        grantPermissions = null
+                    )
+                )
+            }
+            scripts
+        }
+    }
+
+    fun setScriptEnabled(name: String, enabled: Boolean) {
+        executeAsync {
+            database.execSQL("UPDATE scripts SET enabled = ? WHERE name = ?", arrayOf(
+                if (enabled) 1 else 0,
+                name
+            ))
+        }
+    }
+
+    fun isScriptEnabled(name: String): Boolean {
+        return database.rawQuery("SELECT enabled FROM scripts WHERE name = ?", arrayOf(name)).use { cursor ->
+            if (!cursor.moveToFirst()) return@use false
+            cursor.getInteger("enabled") == 1
+        }
+    }
+
+    fun syncScripts(availableScripts: List<ModuleInfo>) {
+        executeAsync {
+            val enabledScripts = getScripts()
+            val enabledScriptPaths = enabledScripts.map { it.name }
+            val availableScriptPaths = availableScripts.map { it.name }
+
+            enabledScripts.forEach { script ->
+                if (!availableScriptPaths.contains(script.name)) {
+                    database.execSQL("DELETE FROM scripts WHERE name = ?", arrayOf(script.name))
+                }
+            }
+
+            availableScripts.forEach { script ->
+                if (!enabledScriptPaths.contains(script.name)) {
+                    database.execSQL("INSERT OR REPLACE INTO scripts (name, version, description, author, enabled) VALUES (?, ?, ?, ?, ?)", arrayOf(
+                        script.name,
+                        script.version,
+                        script.description,
+                        script.author,
+                        0
+                    ))
+                }
+            }
         }
     }
 }

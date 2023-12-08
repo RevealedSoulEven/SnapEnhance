@@ -4,8 +4,11 @@ import android.util.Log
 
 class NativeLib {
     var nativeUnaryCallCallback: (NativeRequestData) -> Unit = {}
+    var nativeShouldLoadAsset: (String) -> Boolean = { true }
+
     companion object {
-        private var initialized = false
+        var initialized = false
+            private set
     }
 
     fun initOnce(classloader: ClassLoader) {
@@ -15,7 +18,7 @@ class NativeLib {
             init(classloader)
             initialized = true
         }.onFailure {
-            Log.e("SnapEnhance", "NativeLib init failed", it)
+            Log.e("SnapEnhance", "NativeLib init failed")
         }
     }
 
@@ -31,6 +34,11 @@ class NativeLib {
         if (!nativeRequestData.buffer.contentEquals(buffer) || nativeRequestData.canceled) return nativeRequestData
         return null
     }
+
+    @Suppress("unused")
+    private fun shouldLoadAsset(name: String) = runCatching {
+        nativeShouldLoadAsset(name)
+    }.getOrNull() ?: true
 
     fun loadNativeConfig(config: NativeConfig) {
         if (!initialized) return

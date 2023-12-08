@@ -1,8 +1,8 @@
 package me.rhunk.snapenhance.mapper.tests
 
 import com.google.gson.GsonBuilder
-import me.rhunk.snapmapper.Mapper
-import me.rhunk.snapmapper.impl.*
+import me.rhunk.snapenhance.mapper.Mapper
+import me.rhunk.snapenhance.mapper.impl.*
 import org.junit.Test
 import java.io.File
 
@@ -15,15 +15,16 @@ class TestMappings {
             CallbackMapper::class,
             DefaultMediaItemMapper::class,
             MediaQualityLevelProviderMapper::class,
-            EnumMapper::class,
             OperaPageViewControllerMapper::class,
-            PlatformAnalyticsCreatorMapper::class,
             PlusSubscriptionMapper::class,
             ScCameraSettingsMapper::class,
             StoryBoostStateMapper::class,
             FriendsFeedEventDispatcherMapper::class,
             CompositeConfigurationProviderMapper::class,
             ScoreUpdateMapper::class,
+            FriendRelationshipChangerMapper::class,
+            ViewBinderMapper::class,
+            FriendingDataSourcesMapper::class,
         )
 
         val gson = GsonBuilder().setPrettyPrinting().create()

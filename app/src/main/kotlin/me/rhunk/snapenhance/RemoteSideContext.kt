@@ -3,45 +3,73 @@ package me.rhunk.snapenhance
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.core.app.CoreComponentFactory
 import androidx.documentfile.provider.DocumentFile
 import coil.ImageLoader
 import coil.decode.VideoFrameDecoder
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import me.rhunk.snapenhance.bridge.BridgeService
-import me.rhunk.snapenhance.bridge.wrapper.LocaleWrapper
-import me.rhunk.snapenhance.bridge.wrapper.MappingsWrapper
-import me.rhunk.snapenhance.core.config.ModConfig
-import me.rhunk.snapenhance.download.DownloadTaskManager
+import me.rhunk.snapenhance.common.BuildConfig
+import me.rhunk.snapenhance.common.bridge.types.BridgeFileType
+import me.rhunk.snapenhance.common.bridge.wrapper.LocaleWrapper
+import me.rhunk.snapenhance.common.bridge.wrapper.MappingsWrapper
+import me.rhunk.snapenhance.common.bridge.wrapper.MessageLoggerWrapper
+import me.rhunk.snapenhance.common.config.ModConfig
+import me.rhunk.snapenhance.e2ee.E2EEImplementation
 import me.rhunk.snapenhance.messaging.ModDatabase
 import me.rhunk.snapenhance.messaging.StreaksReminder
+import me.rhunk.snapenhance.scripting.RemoteScriptManager
+import me.rhunk.snapenhance.task.TaskManager
+import me.rhunk.snapenhance.ui.manager.MainActivity
 import me.rhunk.snapenhance.ui.manager.data.InstallationSummary
-import me.rhunk.snapenhance.ui.manager.data.ModMappingsInfo
+import me.rhunk.snapenhance.ui.manager.data.ModInfo
+import me.rhunk.snapenhance.ui.manager.data.PlatformInfo
 import me.rhunk.snapenhance.ui.manager.data.SnapchatAppInfo
+import me.rhunk.snapenhance.ui.overlay.SettingsOverlay
 import me.rhunk.snapenhance.ui.setup.Requirements
 import me.rhunk.snapenhance.ui.setup.SetupActivity
+import java.io.ByteArrayInputStream
 import java.lang.ref.WeakReference
+import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
+import kotlin.time.Duration.Companion.days
+
 
 class RemoteSideContext(
     val androidContext: Context
 ) {
+    val coroutineScope = CoroutineScope(Dispatchers.IO)
+
     private var _activity: WeakReference<ComponentActivity>? = null
-    lateinit var bridgeService: BridgeService
+    var bridgeService: BridgeService? = null
 
     var activity: ComponentActivity?
         get() = _activity?.get()
         set(value) { _activity?.clear(); _activity = WeakReference(value) }
 
-    val config = ModConfig()
+    val sharedPreferences: SharedPreferences get() = androidContext.getSharedPreferences("prefs", 0)
+    val config = ModConfig(androidContext)
     val translation = LocaleWrapper()
     val mappings = MappingsWrapper()
-    val downloadTaskManager = DownloadTaskManager()
+    val taskManager = TaskManager(this)
     val modDatabase = ModDatabase(this)
     val streaksReminder = StreaksReminder(this)
+    val log = LogManager(this)
+    val scriptManager = RemoteScriptManager(this)
+    val settingsOverlay = SettingsOverlay(this)
+    val e2eeImplementation = E2EEImplementation(this)
+    val messageLogger by lazy { MessageLoggerWrapper(androidContext.getDatabasePath(BridgeFileType.MESSAGE_LOGGER_DATABASE.fileName)) }
 
     //used to load bitmoji selfies and download previews
     val imageLoader by lazy {
@@ -61,7 +89,10 @@ class RemoteSideContext(
             .components { add(VideoFrameDecoder.Factory()) }.build()
     }
 
+    val gson: Gson by lazy { GsonBuilder().setPrettyPrinting().create() }
+
     fun reload() {
+        log.verbose("Loading RemoteSideContext")
         runCatching {
             config.loadFromContext(androidContext)
             translation.apply {
@@ -72,45 +103,79 @@ class RemoteSideContext(
                 loadFromContext(androidContext)
                 init(androidContext)
             }
-            downloadTaskManager.init(androidContext)
+            taskManager.init()
             modDatabase.init()
             streaksReminder.init()
+            scriptManager.init()
+            messageLogger.init()
         }.onFailure {
-            Logger.error("Failed to load RemoteSideContext", it)
+            log.error("Failed to load RemoteSideContext", it)
+        }
+
+        scriptManager.runtime.eachModule {
+            callFunction("module.onManagerLoad", androidContext)
         }
     }
 
-    fun getInstallationSummary() = InstallationSummary(
-        snapchatInfo = mappings.getSnapchatPackageInfo()?.let {
-            SnapchatAppInfo(
-                version = it.versionName,
-                versionCode = it.longVersionCode
+    val installationSummary by lazy {
+        InstallationSummary(
+            snapchatInfo = mappings.getSnapchatPackageInfo()?.let {
+                SnapchatAppInfo(
+                    packageName = it.packageName,
+                    version = it.versionName,
+                    versionCode = it.longVersionCode,
+                    isLSPatched = it.applicationInfo.appComponentFactory != CoreComponentFactory::class.java.name,
+                    isSplitApk = it.splitNames?.isNotEmpty() ?: false
+                )
+            },
+            modInfo = ModInfo(
+                loaderPackageName = MainActivity::class.java.`package`?.name,
+                buildPackageName = androidContext.packageName,
+                buildVersion = BuildConfig.VERSION_NAME,
+                buildVersionCode = BuildConfig.VERSION_CODE.toLong(),
+                buildIssuer = androidContext.packageManager.getPackageInfo(androidContext.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+                    ?.signingInfo?.apkContentsSigners?.firstOrNull()?.let {
+                        val certFactory = CertificateFactory.getInstance("X509")
+                        val cert = certFactory.generateCertificate(ByteArrayInputStream(it.toByteArray())) as X509Certificate
+                        cert.issuerDN.toString()
+                    } ?: throw Exception("Failed to get certificate info"),
+                isDebugBuild = BuildConfig.DEBUG,
+                mappingVersion = mappings.getGeneratedBuildNumber(),
+                mappingsOutdated = mappings.isMappingsOutdated()
+            ),
+            platformInfo = PlatformInfo(
+                device = Build.DEVICE,
+                androidVersion = Build.VERSION.RELEASE,
+                systemAbi = Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"
             )
-        },
-        mappingsInfo = if (mappings.isMappingsLoaded()) {
-            ModMappingsInfo(
-                generatedSnapchatVersion = mappings.getGeneratedBuildNumber(),
-                isOutdated = mappings.isMappingsOutdated()
-            )
-        } else null
-    )
+        )
+    }
 
     fun longToast(message: Any) {
         androidContext.mainExecutor.execute {
             Toast.makeText(androidContext, message.toString(), Toast.LENGTH_LONG).show()
         }
-        Logger.debug(message.toString())
+        log.debug(message.toString())
     }
 
     fun shortToast(message: Any) {
         androidContext.mainExecutor.execute {
             Toast.makeText(androidContext, message.toString(), Toast.LENGTH_SHORT).show()
         }
-        Logger.debug(message.toString())
+        log.debug(message.toString())
     }
+
+    fun hasMessagingBridge() = bridgeService != null && bridgeService?.messagingBridge != null
 
     fun checkForRequirements(overrideRequirements: Int? = null): Boolean {
         var requirements = overrideRequirements ?: 0
+
+        if(BuildConfig.DEBUG) {
+            if(System.currentTimeMillis() - BuildConfig.BUILD_TIMESTAMP > 16.days.inWholeMilliseconds) {
+                Toast.makeText(androidContext, "This SnapEnhance build has expired. More info on t.me/snapenhance_ci", Toast.LENGTH_LONG).show();
+                throw RuntimeException("This build has expired. This crash is intentional.")
+            }
+        }
 
         if (!config.wasPresent) {
             requirements = requirements or Requirements.FIRST_RUN

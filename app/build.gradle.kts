@@ -1,6 +1,6 @@
 import com.android.build.gradle.internal.api.BaseVariantOutputImpl
+import org.gradle.configurationcache.extensions.capitalized
 
-@Suppress("DSL_SCOPE_VIOLATION") // TODO: Remove once KTIJ-19369 is fixed
 plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.kotlinAndroid)
@@ -16,11 +16,13 @@ android {
     }
 
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.4.8"
+        kotlinCompilerExtensionVersion = "1.5.2"
     }
 
     defaultConfig {
         applicationId = rootProject.ext["applicationId"].toString()
+        versionCode = rootProject.ext["appVersionCode"].toString().toInt()
+        versionName = rootProject.ext["appVersionName"].toString()
         minSdk = 28
         targetSdk = 34
         multiDexEnabled = true
@@ -32,8 +34,12 @@ android {
             proguardFiles += file("proguard-rules.pro")
         }
         debug {
-            isDebuggable = true
-            isMinifyEnabled = false
+            (properties["debug_flavor"] == null).also {
+                isDebuggable = !it
+                isMinifyEnabled = it
+                isShrinkResources = it
+            }
+            proguardFiles += file("proguard-rules.pro")
         }
     }
 
@@ -54,6 +60,11 @@ android {
                 excludes += "META-INF/*.kotlin_module"
             }
         }
+
+        create("core") {
+            dimension = "abi"
+        }
+
         create("armv8") {
             ndk {
                 abiFilters += "arm64-v8a"
@@ -67,15 +78,25 @@ android {
             }
             dimension = "abi"
         }
+
+        create("all") {
+            ndk {
+                abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+            }
+            dimension = "abi"
+        }
     }
 
     properties["debug_flavor"]?.let {
-        android.productFlavors[it.toString()].setIsDefault(true)
+        android.productFlavors.find { it.name == it.toString()}?.setIsDefault(true)
     }
 
     applicationVariants.all {
-        outputs.map { it as BaseVariantOutputImpl }.forEach { variant ->
-            variant.outputFileName = "app-${rootProject.ext["appVersionName"]}-${variant.name}.apk"
+        outputs.map { it as BaseVariantOutputImpl }.forEach { outputVariant ->
+            outputVariant.outputFileName = when {
+                name.startsWith("core") -> "core.apk"
+                else -> "snapenhance_${rootProject.ext["appVersionName"]}-${outputVariant.name}.apk"
+            }
         }
     }
 
@@ -89,37 +110,55 @@ android {
     }
 }
 
+androidComponents {
+    onVariants(selector().withFlavor("abi", "core")) {
+        it.packaging.jniLibs.apply {
+            pickFirsts.set(listOf("**/lib${rootProject.ext["buildHash"]}.so"))
+            excludes.set(listOf("**/*.so"))
+        }
+    }
+}
+
 dependencies {
+    fun fullImplementation(dependencyNotation: Any) {
+        compileOnly(dependencyNotation)
+        for (flavorName in listOf("armv8", "armv7", "all")) {
+            dependencies.add("${flavorName}Implementation", dependencyNotation)
+        }
+    }
+
     implementation(project(":core"))
-    implementation(libs.androidx.material.icons.core)
-    implementation(libs.androidx.material.ripple)
-    implementation(libs.androidx.material.icons.extended)
-    implementation(libs.androidx.material3)
-    implementation(libs.androidx.activity.ktx)
-    implementation(libs.androidx.navigation.compose)
+    implementation(project(":common"))
     implementation(libs.androidx.documentfile)
     implementation(libs.gson)
-    implementation(libs.coil.compose)
-    implementation(libs.coil.video)
+    implementation(libs.ffmpeg.kit)
     implementation(libs.osmdroid.android)
-
-    debugImplementation("androidx.compose.ui:ui-tooling:1.4.3")
-    implementation("androidx.compose.ui:ui-tooling-preview:1.4.3")
-    implementation(kotlin("reflect"))
+    implementation(libs.rhino)
+    implementation(libs.androidx.activity.ktx)
+    fullImplementation(platform(libs.androidx.compose.bom))
+    fullImplementation(libs.bcprov.jdk18on)
+    fullImplementation(libs.androidx.navigation.compose)
+    fullImplementation(libs.androidx.material.icons.core)
+    fullImplementation(libs.androidx.material.ripple)
+    fullImplementation(libs.androidx.material.icons.extended)
+    fullImplementation(libs.androidx.material3)
+    fullImplementation(libs.coil.compose)
+    fullImplementation(libs.coil.video)
+    fullImplementation(libs.androidx.ui.tooling.preview)
+    properties["debug_flavor"]?.let {
+        debugImplementation(libs.androidx.ui.tooling)
+    }
 }
 
 afterEvaluate {
-    properties["debug_assemble_task"]?.let { tasks.named(it.toString()) }?.orNull?.doLast {
+    properties["debug_flavor"]?.toString()?.let { tasks.findByName("install${it.capitalized()}Debug") }?.doLast {
         runCatching {
-            val apkDebugFile = android.applicationVariants.find { it.buildType.name == "debug" && it.flavorName == properties["debug_flavor"] }?.outputs?.first()?.outputFile ?: return@doLast
             exec {
-                commandLine("adb", "shell", "am", "force-stop", "com.snapchat.android")
+                commandLine("adb", "shell", "am", "force-stop", properties["debug_package_name"])
             }
+            Thread.sleep(1000L)
             exec {
-                commandLine("adb", "install", "-r", "-d", apkDebugFile.absolutePath)
-            }
-            exec {
-                commandLine("adb", "shell", "am", "start", "com.snapchat.android")
+                commandLine("adb", "shell", "am", "start", properties["debug_package_name"])
             }
         }
     }

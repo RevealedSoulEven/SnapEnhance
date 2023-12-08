@@ -7,13 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForwardIos
 import androidx.compose.material.icons.filled.Check
@@ -36,6 +30,7 @@ import me.rhunk.snapenhance.SharedContextHolder
 import me.rhunk.snapenhance.ui.AppMaterialTheme
 import me.rhunk.snapenhance.ui.setup.screens.SetupScreen
 import me.rhunk.snapenhance.ui.setup.screens.impl.MappingsScreen
+import me.rhunk.snapenhance.ui.setup.screens.impl.PermissionsScreen
 import me.rhunk.snapenhance.ui.setup.screens.impl.PickLanguageScreen
 import me.rhunk.snapenhance.ui.setup.screens.impl.SaveFolderScreen
 
@@ -64,6 +59,9 @@ class SetupActivity : ComponentActivity() {
             val isFirstRun = hasRequirement(Requirements.FIRST_RUN)
             if (isFirstRun || hasRequirement(Requirements.LANGUAGE)) {
                 add(PickLanguageScreen().apply { route = "language" })
+            }
+            if (isFirstRun || hasRequirement(Requirements.GRANT_PERMISSIONS)) {
+                add(PermissionsScreen().apply { route = "permissions" })
             }
             if (isFirstRun || hasRequirement(Requirements.SAVE_FOLDER)) {
                 add(SaveFolderScreen().apply { route = "saveFolder" })
@@ -143,6 +141,10 @@ class SetupActivity : ComponentActivity() {
                         ) {
                             requiredScreens.forEach { screen ->
                                 screen.allowNext = { canGoNext = it }
+                                screen.goNext = {
+                                    canGoNext = true
+                                    nextScreen()
+                                }
                                 composable(screen.route) {
                                     BackHandler(true) {}
                                     Column(

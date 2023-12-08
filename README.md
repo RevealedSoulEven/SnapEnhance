@@ -8,11 +8,6 @@ SnapEnhance is an Xposed mod that enhances your Snapchat experience.<br/><br/>
 Please note that this project is currently in development, so bugs and crashes may occur. If you encounter any issues, we encourage you to report them. To do this simply visit our [issues](https://github.com/rhunk/SnapEnhance/issues) page and create an issue, make sure to follow the guidelines.
 </div>
 
-## Download 
-To Download the latest stable release, please visit the [Releases](https://github.com/rhunk/SnapEnhance/releases) page.<br/>
-You can also download the latest debug build from the [Actions](https://github.com/rhunk/SnapEnhance/actions) section.<br/>
-We no longer offer official LSPatch binaries for obvious reasons. However, you're welcome to patch them yourself, as they should theoretically work without any issues.
-
 ## Quick Start
 Requirements:
 - Rooted using Magisk or KernelSU
@@ -24,6 +19,11 @@ Although using this in an unrooted enviroment using something like LSPatch shoul
 2. Turn on the module in LSPosed and make sure Snapchat is in scope
 3. Force Stop Snapchat
 4. Open the menu by clicking the [Settings Gear Icon](https://i.imgur.com/2grm8li.png)
+
+## Download 
+To Download the latest stable release, please visit the [Releases](https://github.com/rhunk/SnapEnhance/releases) page.<br/>
+You can also download the latest debug build from the [Actions](https://github.com/rhunk/SnapEnhance/actions) section.<br/>
+We no longer offer official LSPatch binaries for obvious reasons. However, you're welcome to patch them yourself, as they should theoretically work without any issues.
 
 ## Features
 <details open>
@@ -57,7 +57,7 @@ Although using this in an unrooted enviroment using something like LSPatch shoul
   <summary>UI & Tweaks</summary>
 
   - Disable Camera
-  - Immersive Camera Preview (Fix Snapchat's camera bug)
+  - Immersive Camera Preview (Fix Snapchats camera bug)
   - Hide certain UI Elements
   - Show Streak Expiration Info
   - Disable Snap Splitting
@@ -82,10 +82,94 @@ Although using this in an unrooted enviroment using something like LSPatch shoul
   - Chat Export (HTML, JSON and TXT)
 </details>
 
-## License
-The [GNU GPL v3](https://www.gnu.org/licenses/gpl-3.0.en.html#license-text) license is a free, open-source software license that grants users the right to modify, share, and redistribute the software.<br/>
-By using this software, you agree to make the source code freely available, along with any modifications, additions, or derivatives. <br/>
-When redistributing the software, it must remain under the same [GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.html#license-text) license, and any modifications should be clearly indicated as such.<br/>
+## FAQ
+<details>
+  <summary>AI wallpapers and the Snapchat+ badge aren't working!</summary>
+  
+  - Yeah, they're server-sided and will probably never work.
+</details>
+
+<details>
+  <summary>Can you add this feature, please?</summary>
+  
+  - Open an issue on our Github repo.
+</details>
+
+<details>
+  <summary>When will this feature become available or finish?</summary>
+  
+  - At some point.
+</details>
+
+<details>
+  <summary>Can I get banned with this?</summary>
+  
+  - Obviously, however, the risk is very low, and we have no reported cases of anyone ever getting banned while using the mod.
+</details>
+
+<details>
+  <summary>Can I PM the developers?</summary>
+  
+  - No.
+</details>
+
+<details>
+  <summary>This doesn't work!</summary>
+  
+  - Open an issue.
+</details>
+
+<details>
+  <summary>My phone isn't rooted; how do I use this?</summary>
+  
+  - You can use LSPatch in combination with SnapEnhance to run this on an unrooted device, however this is unrecommended and not considered safe.
+</details>
+
+<details>
+  <summary>Where can I download the latest stable build?</summary>
+  
+  - https://github.com/rhunk/snapenhance/releases
+</details>
+
+<details>
+  <summary>Can I use HideMyApplist with this?</summary>
+  
+  - No, this will cause some severe issues, and the mod will not be able to inject.
+</details>
+
+## Privacy
+We do not collect any user information. However, please be aware that third-party libraries may collect data as described in their respective privacy policies.
+<details>
+  <summary>Permissions</summary>
+  
+  - [android.permission.INTERNET](https://developer.android.com/reference/android/Manifest.permission#INTERNET)
+  - [android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS](https://developer.android.com/reference/android/Manifest.permission.html#REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+  - [android.permission.POST_NOTIFICATIONS](https://developer.android.com/reference/android/Manifest.permission.html#POST_NOTIFICATIONS)
+  - [android.permission.SYSTEM_ALERT_WINDOW](https://developer.android.com/reference/android/Manifest.permission#SYSTEM_ALERT_WINDOW)
+</details>
+
+<details>
+  <summary>Third-party libraries used</summary>
+  
+  - [libxposed](https://github.com/libxposed/api)
+  - [ffmpeg-kit-full-gpl](https://github.com/arthenica/ffmpeg-kit)
+  - [osmdroid](https://github.com/osmdroid/osmdroid)
+  - [coil](https://github.com/coil-kt/coil)
+  - [Dobby](https://github.com/jmpews/Dobby)
+  - [rhino](https://github.com/mozilla/rhino)
+  - [libsu](https://github.com/topjohnwu/libsu)
+</details>
+
+## Contributors
+Thanks to everyone involved including the [third-party libraries](https://github.com/rhunk/SnapEnhance?tab=readme-ov-file#privacy) used!
+- [rathmerdominik](https://github.com/rathmerdominik)
+- [Flole998](https://github.com/Flole998)
+- [authorisation](https://github.com/authorisation/)
+- [RevealedSoulEven](https://github.com/revealedsouleven)
+- [iBasim](https://github.com/ibasim)
+- [xerta555](https://github.com/xerta555)
+- [TheVisual](https://github.com/TheVisual)  
+
 
 ## Donate
 - LTC: LbBnT9GxgnFhwy891EdDKqGmpn7XtduBdE
@@ -93,11 +177,7 @@ When redistributing the software, it must remain under the same [GPLv3](https://
 - BTC: bc1qaqnfn6mauzhmx0e6kkenh2wh4r6js0vh5vel92
 - ETH: 0x0760987491e9de53A73fd87F092Bd432a227Ee92
 
-## Contributors
-- [rathmerdominik](https://github.com/rathmerdominik)
-- [Flole998](https://github.com/Flole998)
-- [authorisation](https://github.com/authorisation/)
-- [RevealedSoulEven](https://github.com/revealedsouleven)
-- [iBasim](https://github.com/ibasim)
-- [xerta555](https://github.com/xerta555)
-- [TheVisual](https://github.com/TheVisual)
+## License
+The [GNU GPL v3](https://www.gnu.org/licenses/gpl-3.0.en.html#license-text) license is a free, open-source software license that grants users the right to modify, share, and redistribute the software.
+By using this software, you agree to make the source code freely available, along with any modifications, additions, or derivatives.
+When redistributing the software, it must remain under the same [GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.html#license-text) license, and any modifications should be clearly indicated as such.

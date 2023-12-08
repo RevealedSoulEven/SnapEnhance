@@ -1,12 +1,7 @@
 package me.rhunk.snapenhance.ui.manager.sections.social
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
+import android.content.Intent
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
@@ -17,7 +12,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,10 +22,14 @@ import androidx.navigation.NavController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import me.rhunk.snapenhance.RemoteSideContext
-import me.rhunk.snapenhance.core.messaging.MessagingRuleType
-import me.rhunk.snapenhance.core.messaging.SocialScope
+import me.rhunk.snapenhance.common.data.MessagingRuleType
+import me.rhunk.snapenhance.common.data.SocialScope
+import me.rhunk.snapenhance.common.util.snap.BitmojiSelfie
+import me.rhunk.snapenhance.ui.util.AlertDialogs
 import me.rhunk.snapenhance.ui.util.BitmojiImage
-import me.rhunk.snapenhance.util.snap.BitmojiSelfie
+import me.rhunk.snapenhance.ui.util.Dialog
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 class ScopeContent(
     private val context: RemoteSideContext,
@@ -40,6 +38,9 @@ class ScopeContent(
     val scope: SocialScope,
     private val id: String
 ) {
+    private val dialogs by lazy { AlertDialogs(context.translation) }
+    private val translation by lazy { context.translation.getCategory("manager.sections.social") }
+
     fun deleteScope(coroutineScope: CoroutineScope) {
         when (scope) {
             SocialScope.FRIEND -> context.modDatabase.deleteFriend(id)
@@ -56,8 +57,7 @@ class ScopeContent(
     @Composable
     fun Content() {
         Column(
-            modifier = Modifier
-                .verticalScroll(rememberScrollState())
+            modifier = Modifier.verticalScroll(rememberScrollState())
         ) {
             when (scope) {
                 SocialScope.FRIEND -> Friend()
@@ -68,11 +68,11 @@ class ScopeContent(
 
             val rules = context.modDatabase.getRules(id)
 
-            SectionTitle("Rules")
+            SectionTitle(translation["rules_title"])
 
             ContentCard {
                 //manager anti features etc
-                MessagingRuleType.values().forEach { ruleType ->
+                MessagingRuleType.entries.forEach { ruleType ->
                     var ruleEnabled by remember {
                         mutableStateOf(rules.any { it.key == ruleType.key })
                     }
@@ -90,10 +90,12 @@ class ScopeContent(
                             maxLines = 1,
                             modifier = Modifier.weight(1f)
                         )
-                        Switch(checked = ruleEnabled, enabled = if (ruleType.listMode) ruleState != null else true, onCheckedChange = {
-                            context.modDatabase.setRule(id, ruleType.key, it)
-                            ruleEnabled = it
-                        })
+                        Switch(checked = ruleEnabled,
+                            enabled = if (ruleType.listMode) ruleState != null else true,
+                            onCheckedChange = {
+                                context.modDatabase.setRule(id, ruleType.key, it)
+                                ruleEnabled = it
+                            })
                     }
                 }
             }
@@ -159,11 +161,12 @@ class ScopeContent(
         return "Expired"
     }
 
+    @OptIn(ExperimentalEncodingApi::class)
     @Composable
     private fun Friend() {
         //fetch the friend from the database
         val friend = remember { context.modDatabase.getFriendInfo(id) } ?: run {
-            Text(text = "Friend not found")
+            Text(text = translation["not_found"])
             return
         }
 
@@ -178,9 +181,7 @@ class ScopeContent(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             val bitmojiUrl = BitmojiSelfie.getBitmojiSelfie(
-                friend.selfieId,
-                friend.bitmojiId,
-                BitmojiSelfie.BitmojiSelfieType.THREE_D
+                friend.selfieId, friend.bitmojiId, BitmojiSelfie.BitmojiSelfieType.THREE_D
             )
             BitmojiImage(context = context, url = bitmojiUrl, size = 100)
             Spacer(modifier = Modifier.height(16.dp))
@@ -197,9 +198,6 @@ class ScopeContent(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Light
             )
-           // Spacer(modifier = Modifier.height(16.dp))
-
-            //DeleteScopeEntityButton()
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -207,7 +205,7 @@ class ScopeContent(
             //streaks
             streaks?.let {
                 var shouldNotify by remember { mutableStateOf(it.notify) }
-                SectionTitle("Streaks")
+                SectionTitle(translation["streaks_title"])
                 ContentCard {
                     Row(
                         verticalAlignment = Alignment.CenterVertically
@@ -215,18 +213,98 @@ class ScopeContent(
                         Column(
                             modifier = Modifier.weight(1f),
                         ) {
-                            Text(text = "Length: ${streaks.length}", maxLines = 1)
-                            Text(text = "Expires in: ${computeStreakETA(streaks.expirationTimestamp)}", maxLines = 1)
+                            Text(
+                                text = translation.format(
+                                    "streaks_length_text", "length" to streaks.length.toString()
+                                ), maxLines = 1
+                            )
+                            Text(
+                                text = translation.format(
+                                    "streaks_expiration_text",
+                                    "eta" to computeStreakETA(streaks.expirationTimestamp)
+                                ), maxLines = 1
+                            )
                         }
                         Row(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(text = "Reminder", maxLines = 1, modifier = Modifier.padding(end = 10.dp))
+                            Text(
+                                text = translation["reminder_button"],
+                                maxLines = 1,
+                                modifier = Modifier.padding(end = 10.dp)
+                            )
                             Switch(checked = shouldNotify, onCheckedChange = {
                                 context.modDatabase.setFriendStreaksNotify(id, it)
                                 shouldNotify = it
                             })
                         }
+                    }
+                }
+            }
+            // e2ee section
+
+            SectionTitle(translation["e2ee_title"])
+            var hasSecretKey by remember { mutableStateOf(context.e2eeImplementation.friendKeyExists(friend.userId))}
+            var importDialog by remember { mutableStateOf(false) }
+
+            if (importDialog) {
+                Dialog(
+                    onDismissRequest = { importDialog = false }
+                ) {
+                    dialogs.RawInputDialog(onDismiss = { importDialog = false  }, onConfirm = { newKey ->
+                        importDialog = false
+                        runCatching {
+                            val key = Base64.decode(newKey)
+                            if (key.size != 32) {
+                                context.longToast("Invalid key size (must be 32 bytes)")
+                                return@runCatching
+                            }
+
+                            context.e2eeImplementation.storeSharedSecretKey(friend.userId, key)
+                            context.longToast("Successfully imported key")
+                            hasSecretKey = true
+                        }.onFailure {
+                            context.longToast("Failed to import key: ${it.message}")
+                            context.log.error("Failed to import key", it)
+                        }
+                    })
+                }
+            }
+
+            ContentCard {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    if (hasSecretKey) {
+                        OutlinedButton(onClick = {
+                            val secretKey = Base64.encode(context.e2eeImplementation.getSharedSecretKey(friend.userId) ?: return@OutlinedButton)
+                            //TODO: fingerprint auth
+                            context.activity!!.startActivity(Intent.createChooser(Intent().apply {
+                                action = Intent.ACTION_SEND
+                                putExtra(Intent.EXTRA_TEXT, secretKey)
+                                type = "text/plain"
+                            }, "").apply {
+                                putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(
+                                    Intent().apply {
+                                        putExtra(Intent.EXTRA_TEXT, secretKey)
+                                        putExtra(Intent.EXTRA_SUBJECT, secretKey)
+                                    })
+                                )
+                            })
+                        }) {
+                            Text(
+                                text = "Export Base64",
+                                maxLines = 1
+                            )
+                        }
+                    }
+
+                    OutlinedButton(onClick = { importDialog = true }) {
+                        Text(
+                            text = "Import Base64",
+                            maxLines = 1
+                        )
                     }
                 }
             }
@@ -237,14 +315,26 @@ class ScopeContent(
     private fun Group() {
         //fetch the group from the database
         val group = remember { context.modDatabase.getGroupInfo(id) } ?: run {
-            Text(text = "Group not found")
+            Text(text = translation["not_found"])
             return
         }
 
-        Column {
-            Text(text = group.name, maxLines = 1)
-            Text(text = "participantsCount: ${group.participantsCount}", maxLines = 1)
-            Spacer(modifier = Modifier.height(16.dp))
+
+        Column(
+            modifier = Modifier
+                .padding(10.dp)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = group.name, maxLines = 1, fontSize = 20.sp, fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(5.dp))
+            Text(
+                text = translation.format(
+                    "participants_text", "count" to group.participantsCount.toString()
+                ), maxLines = 1, fontSize = 12.sp, fontWeight = FontWeight.Light
+            )
         }
     }
 }

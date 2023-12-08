@@ -1,10 +1,9 @@
-@Suppress("DSL_SCOPE_VIOLATION") // TODO: Remove once KTIJ-19369 is fixed
 plugins {
     alias(libs.plugins.androidLibrary)
     alias(libs.plugins.kotlinAndroid)
 }
 
-val nativeName = System.nanoTime().toString(16)
+val nativeName = rootProject.ext.get("buildHash")
 
 android {
     namespace = rootProject.ext["applicationId"].toString() + ".nativelib"
@@ -30,7 +29,8 @@ android {
             }
             ndk {
                 //noinspection ChromeOsAbiSupport
-                abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+                abiFilters += properties["debug_abi_filters"]?.toString()?.split(",")
+                    ?: listOf("arm64-v8a", "armeabi-v7a")
             }
         }
     }

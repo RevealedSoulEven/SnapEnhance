@@ -1,60 +1,25 @@
 package me.rhunk.snapenhance.ui.manager.sections.features
 
+import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.Save
-import androidx.compose.material3.BottomSheetScaffoldState
-import androidx.compose.material3.Card
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.rememberBottomSheetScaffoldState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -65,7 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
 import androidx.navigation.compose.composable
@@ -73,18 +38,10 @@ import androidx.navigation.navigation
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import me.rhunk.snapenhance.core.config.ConfigContainer
-import me.rhunk.snapenhance.core.config.ConfigFlag
-import me.rhunk.snapenhance.core.config.DataProcessors
-import me.rhunk.snapenhance.core.config.PropertyKey
-import me.rhunk.snapenhance.core.config.PropertyPair
-import me.rhunk.snapenhance.core.config.PropertyValue
+import me.rhunk.snapenhance.common.config.*
+import me.rhunk.snapenhance.ui.manager.MainActivity
 import me.rhunk.snapenhance.ui.manager.Section
-import me.rhunk.snapenhance.ui.util.ActivityLauncherHelper
-import me.rhunk.snapenhance.ui.util.AlertDialogs
-import me.rhunk.snapenhance.ui.util.chooseFolder
-import me.rhunk.snapenhance.ui.util.openFile
-import me.rhunk.snapenhance.ui.util.saveFile
+import me.rhunk.snapenhance.ui.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 class FeaturesSection : Section() {
@@ -97,7 +54,7 @@ class FeaturesSection : Section() {
     }
 
 
-    private lateinit var activityLauncherHelper: ActivityLauncherHelper
+    private var activityLauncherHelper: ActivityLauncherHelper? = null
     private val featuresRouteName by lazy { context.translation["manager.routes.features"] }
 
     private lateinit var rememberScaffoldState: BottomSheetScaffoldState
@@ -127,6 +84,13 @@ class FeaturesSection : Section() {
         properties
     }
 
+    private fun navigateToMainRoot() {
+        navController.navigate(MAIN_ROUTE, NavOptions.Builder()
+            .setPopUpTo(navController.graph.findStartDestination().id, false)
+            .setLaunchSingleTop(true)
+            .build()
+        )
+    }
 
     override fun canGoBack() = sectionTopBarName() != featuresRouteName
 
@@ -140,6 +104,16 @@ class FeaturesSection : Section() {
 
     override fun init() {
         activityLauncherHelper = ActivityLauncherHelper(context.activity!!)
+    }
+
+    private fun activityLauncher(block: ActivityLauncherHelper.() -> Unit) {
+        activityLauncherHelper?.let(block) ?: run {
+            //open manager if activity launcher is null
+            val intent = Intent(context.androidContext, MainActivity::class.java)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            intent.putExtra("route", enumSection.route)
+            context.androidContext.startActivity(intent)
+        }
     }
 
     override fun build(navGraphBuilder: NavGraphBuilder) {
@@ -183,7 +157,10 @@ class FeaturesSection : Section() {
 
         if (showDialog) {
             Dialog(
-                onDismissRequest = { showDialog = false }
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false
+                ),
+                onDismissRequest = { showDialog = false },
             ) {
                 dialogComposable()
             }
@@ -193,8 +170,10 @@ class FeaturesSection : Section() {
 
         if (property.key.params.flags.contains(ConfigFlag.FOLDER)) {
             IconButton(onClick = registerClickCallback {
-                activityLauncherHelper.chooseFolder { uri ->
-                    propertyValue.setAny(uri)
+                activityLauncher {
+                    chooseFolder { uri ->
+                        propertyValue.setAny(uri)
+                    }
                 }
             }.let { { it.invoke(true) } }) {
                 Icon(Icons.Filled.FolderOpen, contentDescription = null)
@@ -210,6 +189,24 @@ class FeaturesSection : Section() {
                     onCheckedChange = registerClickCallback {
                         state = state.not()
                         propertyValue.setAny(state)
+                    }
+                )
+            }
+
+            DataProcessors.Type.MAP_COORDINATES -> {
+                registerDialogOnClickCallback()
+                dialogComposable = {
+                    alertDialogs.ChooseLocationDialog(property) {
+                        showDialog = false
+                    }
+                }
+
+                Text(
+                    overflow = TextOverflow.Ellipsis,
+                    maxLines = 1,
+                    modifier = Modifier.widthIn(0.dp, 120.dp),
+                    text = (propertyValue.get() as Pair<*, *>).let {
+                        "${it.first.toString().toFloatOrNull() ?: 0F}, ${it.second.toString().toFloatOrNull() ?: 0F}"
                     }
                 )
             }
@@ -301,6 +298,13 @@ class FeaturesSection : Section() {
     @Composable
     private fun PropertyCard(property: PropertyPair<*>) {
         var clickCallback by remember { mutableStateOf<ClickCallback?>(null) }
+        val noticeColorMap = mapOf(
+            FeatureNotice.UNSTABLE.key to Color(0xFFFFFB87),
+            FeatureNotice.BAN_RISK.key to Color(0xFFFF8585),
+            FeatureNotice.INTERNAL_BEHAVIOR.key to Color(0xFFFFFB87),
+            FeatureNotice.REQUIRE_NATIVE_HOOKS.key to Color(0xFFFF5722),
+        )
+
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -356,13 +360,12 @@ class FeaturesSection : Section() {
                     }.forEach {
                         Text(
                             text = context.translation["features.notices.${it.key}"],
-                            color = Color.Yellow,
+                            color = noticeColorMap[it.key] ?: Color(0xFFFFFB87),
                             fontSize = 12.sp,
                             lineHeight = 15.sp
                         )
                     }
                 }
-
                 Row(
                     modifier = Modifier
                         .align(Alignment.CenterVertically)
@@ -390,7 +393,7 @@ class FeaturesSection : Section() {
                 onValueChange = { keyword ->
                     searchValue = keyword
                     if (keyword.isEmpty()) {
-                        navController.navigate(MAIN_ROUTE)
+                        navigateToMainRoot()
                         return@TextField
                     }
                     currentSearchJob?.cancel()
@@ -439,8 +442,8 @@ class FeaturesSection : Section() {
 
         IconButton(onClick = {
             showSearchBar = showSearchBar.not()
-            if (!showSearchBar && navController.currentBackStackEntry?.destination?.route == SEARCH_FEATURE_ROUTE) {
-                navController.navigate(MAIN_ROUTE)
+            if (!showSearchBar && currentRoute == SEARCH_FEATURE_ROUTE) {
+                navigateToMainRoot()
             }
         }) {
             Icon(
@@ -472,24 +475,28 @@ class FeaturesSection : Section() {
         val actions = remember {
             mapOf(
                 "Export" to {
-                    activityLauncherHelper.saveFile("config.json", "application/json") { uri ->
-                        context.androidContext.contentResolver.openOutputStream(Uri.parse(uri))?.use {
-                            context.config.writeConfig()
-                            context.config.exportToString().byteInputStream().copyTo(it)
-                            context.shortToast("Config exported successfully!")
+                    activityLauncher {
+                        saveFile("config.json", "application/json") { uri ->
+                            context.androidContext.contentResolver.openOutputStream(Uri.parse(uri))?.use {
+                                context.config.writeConfig()
+                                context.config.exportToString().byteInputStream().copyTo(it)
+                                context.shortToast("Config exported successfully!")
+                            }
                         }
                     }
                 },
                 "Import" to {
-                    activityLauncherHelper.openFile("application/json") { uri ->
-                        context.androidContext.contentResolver.openInputStream(Uri.parse(uri))?.use {
-                            runCatching {
-                                context.config.loadFromString(it.readBytes().toString(Charsets.UTF_8))
-                            }.onFailure {
-                                context.longToast("Failed to import config ${it.message}")
-                                return@use
+                    activityLauncher {
+                        openFile("application/json") { uri ->
+                            context.androidContext.contentResolver.openInputStream(Uri.parse(uri))?.use {
+                                runCatching {
+                                    context.config.loadFromString(it.readBytes().toString(Charsets.UTF_8))
+                                }.onFailure {
+                                    context.longToast("Failed to import config ${it.message}")
+                                    return@use
+                                }
+                                context.shortToast("Config successfully loaded!")
                             }
-                            context.shortToast("Config successfully loaded!")
                         }
                     }
                 },
@@ -505,7 +512,7 @@ class FeaturesSection : Section() {
         }
 
         if (showExportDropdownMenu) {
-            DropdownMenu(expanded = showExportDropdownMenu, onDismissRequest = { showExportDropdownMenu = false }) {
+            DropdownMenu(expanded = true, onDismissRequest = { showExportDropdownMenu = false }) {
                 actions.forEach { (name, action) ->
                     DropdownMenuItem(
                         text = {

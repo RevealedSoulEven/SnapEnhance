@@ -1,33 +1,13 @@
 package me.rhunk.snapenhance.ui.manager.sections.social
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -43,20 +23,23 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import me.rhunk.snapenhance.Logger
 import me.rhunk.snapenhance.RemoteSideContext
-import me.rhunk.snapenhance.bridge.BridgeClient
-import me.rhunk.snapenhance.core.messaging.MessagingFriendInfo
-import me.rhunk.snapenhance.core.messaging.MessagingGroupInfo
-import me.rhunk.snapenhance.util.snap.SnapWidgetBroadcastReceiverHelper
+import me.rhunk.snapenhance.common.ReceiversConfig
+import me.rhunk.snapenhance.common.data.MessagingFriendInfo
+import me.rhunk.snapenhance.common.data.MessagingGroupInfo
+import me.rhunk.snapenhance.common.data.SocialScope
+import me.rhunk.snapenhance.common.util.snap.SnapWidgetBroadcastReceiverHelper
 
 class AddFriendDialog(
     private val context: RemoteSideContext,
     private val section: SocialSection,
 ) {
+
+    private val translation by lazy { context.translation.getCategory("manager.dialogs.add_friend")}
+
     @Composable
-    private fun ListCardEntry(name: String, currentState: () -> Boolean, onState: (Boolean) -> Unit = {}) {
-        var currentState by remember { mutableStateOf(currentState()) }
+    private fun ListCardEntry(name: String, getCurrentState: () -> Boolean, onState: (Boolean) -> Unit = {}) {
+        var currentState by remember { mutableStateOf(getCurrentState()) }
 
         Row(
             modifier = Modifier
@@ -74,7 +57,7 @@ class AddFriendDialog(
                 modifier = Modifier
                     .weight(1f)
                     .onGloballyPositioned {
-                        currentState = currentState()
+                        currentState = getCurrentState()
                     }
             )
 
@@ -96,7 +79,7 @@ class AddFriendDialog(
                 .padding(10.dp),
         ) {
             Text(
-                text = "Add Friend or Group",
+                text = translation["title"],
                 fontSize = 23.sp,
                 fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier
@@ -114,7 +97,7 @@ class AddFriendDialog(
                 value = searchKeyword.value,
                 onValueChange = { searchKeyword.value = it },
                 label = {
-                    Text(text = "Search")
+                    Text(text = translation["search_hint"])
                 },
                 modifier = Modifier
                     .weight(1f)
@@ -145,11 +128,11 @@ class AddFriendDialog(
                 timeoutJob?.cancel()
                 hasFetchError = false
             }
-            SnapWidgetBroadcastReceiverHelper.create(BridgeClient.BRIDGE_SYNC_ACTION) {}.also {
+            SnapWidgetBroadcastReceiverHelper.create(ReceiversConfig.BRIDGE_SYNC_ACTION) {}.also {
                 runCatching {
                     context.androidContext.sendBroadcast(it)
                 }.onFailure {
-                    Logger.error("Failed to send broadcast", it)
+                    context.log.error("Failed to send broadcast", it)
                     hasFetchError = true
                 }
             }
@@ -185,7 +168,7 @@ class AddFriendDialog(
                     ) {
                         if (hasFetchError) {
                             Text(
-                                text = "Failed to fetch data",
+                                text = translation["fetch_error"],
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(bottom = 10.dp, top = 10.dp)
@@ -223,7 +206,7 @@ class AddFriendDialog(
                 ) {
                     item {
                         if (filteredGroups.isEmpty()) return@item
-                        Text(text = "Groups",
+                        Text(text = translation["category_groups"],
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(bottom = 10.dp, top = 10.dp)
@@ -234,10 +217,10 @@ class AddFriendDialog(
                         val group = filteredGroups[it]
                         ListCardEntry(
                             name = group.name,
-                            currentState = { context.modDatabase.getGroupInfo(group.conversationId) != null }
+                            getCurrentState = { context.modDatabase.getGroupInfo(group.conversationId) != null }
                         ) { state ->
                             if (state) {
-                                context.bridgeService.triggerGroupSync(group.conversationId)
+                                context.bridgeService?.triggerScopeSync(SocialScope.GROUP, group.conversationId)
                             } else {
                                 context.modDatabase.deleteGroup(group.conversationId)
                             }
@@ -249,7 +232,7 @@ class AddFriendDialog(
 
                     item {
                         if (filteredFriends.isEmpty()) return@item
-                        Text(text = "Friends",
+                        Text(text = translation["category_friends"],
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(bottom = 10.dp, top = 10.dp)
@@ -261,10 +244,10 @@ class AddFriendDialog(
 
                         ListCardEntry(
                             name = friend.displayName?.takeIf { name -> name.isNotBlank() } ?: friend.mutableUsername,
-                            currentState = { context.modDatabase.getFriendInfo(friend.userId) != null }
+                            getCurrentState = { context.modDatabase.getFriendInfo(friend.userId) != null }
                         ) { state ->
                             if (state) {
-                                context.bridgeService.triggerFriendSync(friend.userId)
+                                context.bridgeService?.triggerScopeSync(SocialScope.FRIEND, friend.userId)
                             } else {
                                 context.modDatabase.deleteFriend(friend.userId)
                             }
