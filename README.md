@@ -54,7 +54,7 @@ We no longer offer official LSPatch binaries for obvious reasons. However, you'r
 </details>
 
 <details open>
-  <summary>UI & Tweaks</summary>
+  <summary>UI and Tweaks</summary>
 
   - Disable Camera
   - Immersive Camera Preview (Fix Snapchats camera bug)
