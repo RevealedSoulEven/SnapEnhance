@@ -405,7 +405,21 @@
                     },
                     "message_logger": {
                         "name": "Message Logger",
-                        "description": "Prevents messages from being deleted"
+                        "description": "Prevents messages from being deleted",
+                        "properties": {
+                            "keep_my_own_messages": {
+                                "name": "Keep My Own Messages",
+                                "description": "Prevents your own messages from being deleted"
+                            },
+                            "auto_purge": {
+                                "name": "Auto Purge",
+                                "description": "Automatically deletes cached messages that are older than the specified amount of time"
+                            },
+                            "message_filter": {
+                                "name": "Message Filter",
+                                "description": "Select which messages should get logged (empty for all messages)"
+                            }
+                        }
                     },
                     "auto_save_messages_in_conversations": {
                         "name": "Auto Save Messages",
@@ -567,41 +581,39 @@
                         "name": "Spoof",
                         "description": "Spoof various information about you",
                         "properties": {
-                            "device": {
-                                "name": "Device",
-                                "description": "Spoof your device information",
-                                "properties": {
-                                    "fingerprint": {
-                                        "name": "Device Fingerprint",
-                                        "description": "Spoofs your device Fingerprint"
-                                    },
-                                    "android_id": {
-                                        "name": "Android ID",
-                                        "description": "Spoofs your Android ID to the specified value"
-                                    },
-                                    "installer_package_name": {
-                                        "name": "Installer Package name",
-                                        "description": "Spoofs the installers Package name"
-                                    },
-                                    "debug_flag": {
-                                        "name": "Debug Flag",
-                                        "description": "Makes Snapchat debuggable"
-                                    },
-                                    "mock_location": {
-                                        "name": "Mock location",
-                                        "description": "Spoofs the Mock Location device state"
-                                    },
-                                    "split_classloader": {
-                                        "name": "Split Classloader",
-                                        "description": "Spoofs splitClassloader\nRequested by org.chromium.base.JNIUtils"
-                                    }
-                                }
+                            "play_store_installer_package_name": {
+                                "name": "Play Store Installer Package Name",
+                                "description": "Overrides the installer package name to com.android.vending"
+                            },
+                            "fingerprint": {
+                                "name": "Device Fingerprint",
+                                "description": "Spoofs your device Fingerprint"
+                            },
+                            "android_id": {
+                                "name": "Android ID",
+                                "description": "Spoofs your Android ID to the specified value"
+                            },
+                            "remove_vpn_transport_flag": {
+                                "name": "Remove VPN Transport Flag",
+                                "description": "Prevents Snapchat from detecting VPNs"
+                            },
+                            "remove_mock_location_flag": {
+                                "name": "Remove Mock Location Flag",
+                                "description": "Prevents Snapchat from detecting Mock location"
+                            },
+                            "randomize_persistent_device_token": {
+                                "name": "Randomize Persistent Device Token",
+                                "description": "Generates a random device token after each login"
                             }
                         }
                     },
                     "convert_message_locally": {
                         "name": "Convert Message Locally",
                         "description": "Converts snaps to chat external media locally. This appears in chat download context menu"
+                    },
+                    "story_logger": {
+                        "name": "Story Logger",
+                        "description": "Provides a history of friends stories"
                     },
                     "app_passcode": {
                         "name": "App Passcode",
@@ -652,6 +664,10 @@
                     "disable_composer_modules": {
                         "name": "Disable Composer Modules",
                         "description": "Prevents selected composer modules from being loaded\nNames must be separated by a comma"
+                    },
+                    "prevent_forced_logout": {
+                        "name": "Prevent Forced Logout",
+                        "description": "Prevents Snapchat from logging you out when you login on another device"
                     }
                 }
             },
@@ -697,7 +713,7 @@
                 "auto_save": "\uD83D\uDCAC Auto Save Messages",
                 "stealth": "\uD83D\uDC7B Stealth Mode",
                 "mark_snaps_as_seen": "\uD83D\uDC40 Mark Snaps as seen",
-                "mark_stories_as_seen": "\uD83D\uDC40 Mark Stories as seen",
+                "mark_stories_as_seen_locally": "\uD83D\uDC40 Mark Stories as seen locally",
                 "conversation_info": "\uD83D\uDC64 Conversation Info",
                 "e2e_encryption": "\uD83D\uDD12 Use E2E Encryption"
             },
@@ -761,6 +777,7 @@
             },
             "hide_story_sections": {
                 "hide_friend_suggestions": "Hide friend suggestions",
+                "hide_suggested_friend_stories": "Hide suggested friend stories",
                 "hide_friends": "Hide friends section",
                 "hide_suggested": "Hide suggested section",
                 "hide_for_you": "Hide For You section"
@@ -803,13 +820,27 @@
             "edit_text_override": {
                 "multi_line_chat_input": "Multi Line Chat Input",
                 "bypass_text_input_limit": "Bypass Text Input Limit"
+            },
+            "auto_purge": {
+                "never": "Never",
+                "1_hour": "1 Hour",
+                "3_hours": "3 Hours",
+                "6_hours": "6 Hours",
+                "12_hours": "12 Hours",
+                "1_day": "1 Day",
+                "3_days": "3 Days",
+                "1_week": "1 Week",
+                "2_weeks": "2 Weeks",
+                "1_month": "1 Month",
+                "3_months": "3 Months",
+                "6_months": "6 Months"
             }
         }
     },
 
     "friend_menu_option": {
         "mark_snaps_as_seen": "Mark Snaps as seen",
-        "mark_stories_as_seen": "Mark Stories as seen",
+        "mark_stories_as_seen_locally": "Mark Stories as seen locally",
         "preview": "Preview",
         "stealth_mode": "Stealth Mode",
         "auto_download_blacklist": "Auto Download Blacklist",
@@ -915,12 +946,16 @@
     },
 
     "chat_export": {
-        "select_export_format": "Select the Export Format",
-        "select_media_type": "Select Media Types to export",
-        "select_amount_of_messages": "Select the amount of messages to export (leave empty for all)",
-        "select_conversation": "Select a Conversation to export",
+        "exporter_dialog": {
+            "select_conversations_title": "Select Conversations",
+            "text_field_selection": "{amount} selected",
+            "text_field_selection_all": "All",
+            "export_file_format_title": "Export File Format",
+            "message_type_filter_title": "Filter Messages by Type",
+            "amount_of_messages_title": "Amount of Messages (leave it blank for all)",
+            "download_medias_title": "Download Medias"
+        },
         "dialog_negative_button": "Cancel",
-        "dialog_neutral_button": "Export All",
         "dialog_positive_button": "Export",
         "exported_to": "Exported to {path}",
         "exporting_chats": "Exporting Chats...",

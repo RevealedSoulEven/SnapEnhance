@@ -19,7 +19,7 @@ class UserInterfaceTweaks : ConfigContainer() {
     }
 
     val friendFeedMenuButtons = multiple(
-        "friend_feed_menu_buttons","conversation_info", "mark_snaps_as_seen", "mark_stories_as_seen", *MessagingRuleType.entries.filter { it.showInFriendMenu }.map { it.key }.toTypedArray()
+        "friend_feed_menu_buttons","conversation_info", "mark_snaps_as_seen", "mark_stories_as_seen_locally", *MessagingRuleType.entries.filter { it.showInFriendMenu }.map { it.key }.toTypedArray()
     ).apply {
         set(mutableListOf("conversation_info", MessagingRuleType.STEALTH.key))
     }
@@ -35,7 +35,7 @@ class UserInterfaceTweaks : ConfigContainer() {
     val hideStreakRestore = boolean("hide_streak_restore") { requireRestart() }
     val hideQuickAddFriendFeed = boolean("hide_quick_add_friend_feed") { requireRestart() }
     val hideStorySections = multiple("hide_story_sections",
-        "hide_friend_suggestions", "hide_friends", "hide_suggested", "hide_for_you") { requireRestart() }
+        "hide_friend_suggestions", "hide_suggested_friend_stories", "hide_friends", "hide_suggested", "hide_for_you") { requireRestart() }
     val hideUiComponents = multiple("hide_ui_components",
         "hide_voice_record_button",
         "hide_stickers_button",

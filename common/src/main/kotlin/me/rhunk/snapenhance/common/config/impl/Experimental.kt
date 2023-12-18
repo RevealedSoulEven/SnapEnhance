@@ -9,8 +9,9 @@ class Experimental : ConfigContainer() {
     }
 
     val nativeHooks = container("native_hooks", NativeHooks()) { icon = "Memory"; requireRestart() }
-    val spoof = container("spoof", Spoof()) { icon = "Fingerprint" }
+    val spoof = container("spoof", Spoof()) { icon = "Fingerprint" ; addNotices(FeatureNotice.BAN_RISK); requireRestart() }
     val convertMessageLocally = boolean("convert_message_locally") { requireRestart() }
+    val storyLogger = boolean("story_logger") { requireRestart(); addNotices(FeatureNotice.UNSTABLE); }
     val appPasscode = string("app_passcode")
     val appLockOnResume = boolean("app_lock_on_resume")
     val infiniteStoryBoost = boolean("infinite_story_boost")
@@ -31,4 +32,5 @@ class Experimental : ConfigContainer() {
         "added_by_community",
     ) { addNotices(FeatureNotice.BAN_RISK) }
     val disableComposerModules = string("disable_composer_modules") { requireRestart(); nativeHooks() }
+    val preventForcedLogout = boolean("prevent_forced_logout") { requireRestart(); addNotices(FeatureNotice.BAN_RISK, FeatureNotice.INTERNAL_BEHAVIOR); }
 }

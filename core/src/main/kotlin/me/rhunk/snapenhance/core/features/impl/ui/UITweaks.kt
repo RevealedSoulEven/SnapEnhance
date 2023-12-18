@@ -4,10 +4,13 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.Resources
 import android.text.SpannableString
+import android.util.Size
 import android.view.View
 import android.view.ViewGroup.MarginLayoutParams
 import android.widget.FrameLayout
+import me.rhunk.snapenhance.common.util.ktx.findFieldsToString
 import me.rhunk.snapenhance.core.event.events.impl.AddViewEvent
+import me.rhunk.snapenhance.core.event.events.impl.BindViewEvent
 import me.rhunk.snapenhance.core.features.Feature
 import me.rhunk.snapenhance.core.features.FeatureLoadParams
 import me.rhunk.snapenhance.core.util.hook.HookStage
@@ -51,6 +54,7 @@ class UITweaks : Feature("UITweaks", loadParams = FeatureLoadParams.ACTIVITY_CRE
 
         val chatNoteRecordButton = getId("chat_note_record_button", "id")
         val unreadHintButton = getId("unread_hint_button", "id")
+        val friendCardFrame = getId("friend_card_frame", "id")
 
         View::class.java.hook("setVisibility", HookStage.BEFORE) { methodParam ->
             val viewId = (methodParam.thisObject() as View).id
@@ -68,6 +72,32 @@ class UITweaks : Feature("UITweaks", loadParams = FeatureLoadParams.ACTIVITY_CRE
             if (id == getId("capri_viewfinder_default_corner_radius", "dimen") ||
                 id == getId("ngs_hova_nav_larger_camera_button_size", "dimen")) {
                 param.setResult(0)
+            }
+        }
+
+        var friendCardFrameSize: Size? = null
+
+        context.event.subscribe(BindViewEvent::class, { hideStorySections.contains("hide_suggested_friend_stories") }) { event ->
+            if (event.view.id != friendCardFrame) return@subscribe
+
+            val friendStoryData = event.prevModel::class.java.findFieldsToString(event.prevModel, once = true) { _, value ->
+                value.contains("FriendStoryData")
+            }.firstOrNull()?.get(event.prevModel) ?: return@subscribe
+
+            event.view.layoutParams.apply {
+                if (friendCardFrameSize == null && width > 0 && height > 0) {
+                    friendCardFrameSize = Size(width, height)
+                }
+
+                if (friendStoryData.toString().contains("isFriendOfFriend=true")) {
+                    width = 0
+                    height = 0
+                } else {
+                    friendCardFrameSize?.let {
+                        width = it.width
+                        height = it.height
+                    }
+                }
             }
         }
 
