@@ -138,7 +138,7 @@ We no longer offer official LSPatch binaries for obvious reasons. However, you'r
 </details>
 
 ## Privacy
-We do not collect any user information. However, please be aware that third-party libraries may collect data as described in their respective privacy policies.
+We do not collect any user information or data. However, please be aware that third-party libraries may collect data as described in their respective privacy policies.
 <details>
   <summary>Permissions</summary>
   
