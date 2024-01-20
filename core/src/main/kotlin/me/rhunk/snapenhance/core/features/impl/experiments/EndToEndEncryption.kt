@@ -16,8 +16,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import me.rhunk.snapenhance.common.data.ContentType
+import me.rhunk.snapenhance.common.data.MessageState
 import me.rhunk.snapenhance.common.data.MessagingRuleType
 import me.rhunk.snapenhance.common.data.RuleState
+import me.rhunk.snapenhance.common.database.impl.ConversationMessage
 import me.rhunk.snapenhance.common.util.protobuf.ProtoEditor
 import me.rhunk.snapenhance.common.util.protobuf.ProtoReader
 import me.rhunk.snapenhance.common.util.protobuf.ProtoWriter
@@ -49,7 +51,7 @@ class EndToEndEncryption : MessagingRuleFeature(
     MessagingRuleType.E2E_ENCRYPTION,
     loadParams = FeatureLoadParams.ACTIVITY_CREATE_SYNC or FeatureLoadParams.INIT_SYNC or FeatureLoadParams.INIT_ASYNC
 ) {
-    private val isEnabled get() = context.config.experimental.e2eEncryption.globalState == true
+    val isEnabled get() = context.config.experimental.e2eEncryption.globalState == true
     private val e2eeInterface by lazy { context.bridgeClient.getE2eeInterface() }
 
     companion object {
@@ -267,7 +269,19 @@ class EndToEndEncryption : MessagingRuleFeature(
         }.digest()
     }
 
-    fun tryDecryptMessage(senderId: String, clientMessageId: Long, conversationId: String, contentType: ContentType, messageBuffer: ByteArray): Pair<ContentType, ByteArray> {
+    fun decryptDatabaseMessage(conversationMessage: ConversationMessage): ProtoReader {
+        return tryDecryptMessage(
+            senderId = conversationMessage.senderId!!,
+            clientMessageId = conversationMessage.clientMessageId.toLong(),
+            conversationId = conversationMessage.clientConversationId!!,
+            contentType = ContentType.fromId(conversationMessage.contentType),
+            messageBuffer = ProtoReader(conversationMessage.messageContent!!).getByteArray(4, 4)!!
+        ).let { (_, buffer) ->
+            ProtoReader(buffer)
+        }
+    }
+
+    private fun tryDecryptMessage(senderId: String, clientMessageId: Long, conversationId: String, contentType: ContentType, messageBuffer: ByteArray): Pair<ContentType, ByteArray> {
         if (contentType != ContentType.STATUS && decryptedMessageCache.containsKey(clientMessageId)) {
             return decryptedMessageCache[clientMessageId]!!
         }
@@ -312,7 +326,7 @@ class EndToEndEncryption : MessagingRuleFeature(
             if (messageTypeId == ENCRYPTED_MESSAGE_ID) {
                 runCatching {
                     eachBuffer(2) {
-                        if (encryptedMessages.contains(clientMessageId)) return@eachBuffer
+                        if (decryptedMessageCache.containsKey(clientMessageId)) return@eachBuffer
 
                         val participantIdHash = getByteArray(1) ?: return@eachBuffer
                         val iv = getByteArray(2) ?: return@eachBuffer
@@ -373,10 +387,15 @@ class EndToEndEncryption : MessagingRuleFeature(
         return outputContentType to outputBuffer
     }
 
-    private fun messageHook(conversationId: String, messageId: Long, senderId: String, messageContent: MessageContent) {
+    private fun messageHook(conversationId: String, messageId: Long, senderId: String, messageContent: MessageContent, committed: Boolean) {
         val (contentType, buffer) = tryDecryptMessage(senderId, messageId, conversationId, messageContent.contentType ?: ContentType.CHAT, messageContent.content!!)
         messageContent.contentType = contentType
         messageContent.content = buffer
+        // remove messages currently being sent from the cache
+        if (!committed) {
+            decryptedMessageCache.remove(messageId)
+            encryptedMessages.remove(messageId)
+        }
     }
 
     override fun asyncInit() {
@@ -520,11 +539,13 @@ class EndToEndEncryption : MessagingRuleFeature(
         context.event.subscribe(BuildMessageEvent::class, priority = 0) { event ->
             val message = event.message
             val conversationId = message.messageDescriptor!!.conversationId.toString()
+            val isMessageCommitted = message.messageState == MessageState.COMMITTED
             messageHook(
                 conversationId = conversationId,
                 messageId = message.messageDescriptor!!.messageId!!,
                 senderId = message.senderId.toString(),
-                messageContent = message.messageContent!!
+                messageContent = message.messageContent!!,
+                committed = isMessageCommitted
             )
 
             message.messageContent!!.instanceNonNull()
@@ -535,7 +556,8 @@ class EndToEndEncryption : MessagingRuleFeature(
                     conversationId = conversationId,
                     messageId = quotedMessage.getObjectField("mMessageId")?.toString()?.toLong() ?: return@also,
                     senderId = SnapUUID(quotedMessage.getObjectField("mSenderId")).toString(),
-                    messageContent = MessageContent(quotedMessage)
+                    messageContent = MessageContent(quotedMessage),
+                    committed = isMessageCommitted
                 )
             }
         }
